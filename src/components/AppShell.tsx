@@ -126,19 +126,19 @@ export function AppShell({
 
             {/* Language selector */}
             <Dropdown
-              width="w-44"
+              width="w-48"
               trigger={
                 <button className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl hover:bg-ink-100 transition-colors text-sm font-semibold text-ink-700">
                   <Globe size={16} className="text-ink-400" />
-                  <span className="text-lg leading-none">{LANGUAGES.find((l) => l.code === lang)?.flag}</span>
-                  <span className="text-xs font-bold">{LANGUAGES.find((l) => l.code === lang)?.code.toUpperCase()}</span>
+                  <span className="text-xl leading-none">{LANGUAGES.find((l) => l.code === lang)?.flag}</span>
+                  <span className="text-xs font-bold tracking-wide">{LANGUAGES.find((l) => l.code === lang)?.label}</span>
                   <ChevronDown size={13} className="text-ink-400" />
                 </button>
               }
             >
               {(close) => (
                 <>
-                  <DropdownLabel>🌐 Language</DropdownLabel>
+                  <DropdownLabel>{t('nav_settings')}: Language</DropdownLabel>
                   {LANGUAGES.map((l) => (
                     <button
                       key={l.code}
@@ -148,11 +148,9 @@ export function AppShell({
                       }`
                     }
                     >
-                      <span className="text-lg">{l.flag}</span>
-                      <span className="font-bold uppercase">{l.code}</span>
-                      <span className="text-ink-400">·</span>
-                      <span>{l.label}</span>
-                      {lang === l.code && <Check size={14} className="ml-auto" />}
+                      <span className="text-xl leading-none">{l.flag}</span>
+                      <span className="flex-1">{l.label}</span>
+                      {lang === l.code && <Check size={14} className="text-indigo-600" />}
                     </button>
                   ))}
                 </>

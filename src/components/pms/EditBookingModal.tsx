@@ -76,8 +76,8 @@ export function EditBookingModal({
   if (!open || !initialBooking) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white border border-ink-200/70 rounded-2xl shadow-float max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
         <div className="flex-shrink-0 flex items-center justify-between px-6 h-16 border-b border-ink-100">
           <h2 className="text-xl font-bold text-ink-900">Bronni Tahrirlash</h2>
           <button onClick={onClose} className="btn-ghost h-9 w-9 !p-0 flex items-center justify-center">

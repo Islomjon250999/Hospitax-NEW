@@ -116,9 +116,9 @@ export function Modal({
   if (!open) return null;
   const w = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl' }[size];
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
-      <div className="absolute inset-0 bg-ink-950/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${w} bg-white border border-ink-200/70 rounded-2xl shadow-float animate-scale-in flex flex-col max-h-[85vh]`}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4 animate-fade-in">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className={`relative w-full ${w} bg-white rounded-2xl shadow-2xl animate-scale-in flex flex-col max-h-[85vh] overflow-hidden`}>
         <div className="flex items-center justify-between px-6 h-16 border-b border-ink-100 shrink-0">
           <div className="flex items-center gap-2">
             {icon}
@@ -130,8 +130,7 @@ export function Modal({
         </div>
         <div className="flex-1 overflow-y-auto p-6">{children}</div>
       </div>
-    </div>
-  );
+    </div>);
 }
 
 // ---- SlideOver (right drawer) ----

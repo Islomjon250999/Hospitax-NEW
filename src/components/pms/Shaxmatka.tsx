@@ -316,7 +316,7 @@ export function Shaxmatka({
                 {catRooms.map((room) => {
                   const roomBookings = visibleBookings.filter((b) => b.roomId === room.id);
                   return (
-                    <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `280px repeat(${DAYS}, 1fr)`, height: '56px' }}>
+                    <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)`, height: '56px' }}>
                       <div className="sticky left-0 z-10 bg-inherit px-4 py-2.5 border-r border-ink-100 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <BedDouble size={14} className="text-ink-400 shrink-0" />
@@ -336,14 +336,14 @@ export function Shaxmatka({
                                 rooms: data.rooms.map((r) => r.id === room.id ? { ...r, status: nextStatus } : r),
                               });
                             }}
-                            title="Click to change status"
+                            title={t('rt_clickToCycle')}
                           >
                             {roomStatusDot(room.status)}
-                            <span className="text-[10px] text-ink-500">{room.status}</span>
+                            <span className="text-[10px] text-ink-500">{t(`room_${room.status.toLowerCase()}`)}</span>
                           </button>
                         </div>
                       </div>
-                      <div className="relative w-full" style={{ gridColumn: '2 / -1', display: 'grid', gridTemplateColumns: `repeat(${DAYS}, 1fr)` }}>
+                      <div className="relative w-full overflow-hidden" style={{ gridColumn: '2 / -1', display: 'grid', gridTemplateColumns: `repeat(${DAYS}, 1fr)` }}>
                         {days.map((_, i) => {
                           const dayOffset = startOffset + i;
                           const isInSelection = dragStart && dragEnd && 
@@ -715,23 +715,35 @@ function QuickBookingForm({
   onAdd: (b: Omit<Booking, 'id'>) => void;
 }) {
   const { lang, t } = useLang();
-  const room = rooms.find((r) => r.id === roomId);
-  if (!room) return <div className="p-4">{t('shax_selectRoom')}</div>;
-  const cat = categories.find((c) => c.id === room.categoryId);
-  const roomTariffs = tariffs.filter((tm) => tm.categoryId === room.categoryId);
-
+  const [selectedRoomId, setSelectedRoomId] = useState(roomId);
   const [guest, setGuest] = useState('');
   const [nights, setNights] = useState(2);
   const [country, setCountry] = useState('Uzbekistan');
   const [channel, setChannel] = useState('Direct');
   const [phone, setPhone] = useState('');
-  const [tariffId, setTariffId] = useState(roomTariffs[0]?.id ?? '');
+  const [tariffId, setTariffId] = useState(() => {
+    const r = rooms.find((rm) => rm.id === roomId);
+    if (!r) return '';
+    const rts = tariffs.filter((tm) => tm.categoryId === r.categoryId);
+    return rts[0]?.id ?? '';
+  });
   const [status, setStatus] = useState<BookingStatus>('Confirmed');
   const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Partial' | 'Unpaid'>('Unpaid');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
+  const room = rooms.find((r) => r.id === selectedRoomId);
+  const cat = room ? categories.find((c) => c.id === room.categoryId) : undefined;
+  const roomTariffs = room ? tariffs.filter((tm) => tm.categoryId === room.categoryId) : [];
+
+  const handleRoomChange = (newRoomId: string) => {
+    setSelectedRoomId(newRoomId);
+    const newRoom = rooms.find((r) => r.id === newRoomId);
+    const newTariffs = newRoom ? tariffs.filter((tm) => tm.categoryId === newRoom.categoryId) : [];
+    setTariffId(newTariffs[0]?.id ?? '');
+  };
+
   const tariff = tariffs.find((tm) => tm.id === tariffId);
-  const baseTotal = (tariff?.dailyRate ?? room.baseRate) * nights;
+  const baseTotal = room ? (tariff?.dailyRate ?? room.baseRate) * nights : 0;
   const serviceTotal = services
     .filter((s) => selectedServices.includes(s.id))
     .reduce((sum, s) => sum + (s.calcType === 'Per Night' ? s.unitPrice * nights : s.unitPrice), 0);
@@ -741,9 +753,9 @@ function QuickBookingForm({
     setSelectedServices((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const submit = () => {
-    if (!guest.trim()) return;
+    if (!guest.trim() || !selectedRoomId) return;
     onAdd({
-      roomId,
+      roomId: selectedRoomId,
       guestName: guest.trim(),
       guestCountry: country,
       startOffset: dayOffset,
@@ -761,6 +773,18 @@ function QuickBookingForm({
 
   return (
     <div className="space-y-4">
+      <div>
+        <label className="label">{t('bd_room')}</label>
+        <select value={selectedRoomId} onChange={(e) => handleRoomChange(e.target.value)} className="input">
+          <option value="">—</option>
+          {rooms.map((r) => {
+            const rc = categories.find((c) => c.id === r.categoryId);
+            return <option key={r.id} value={r.id}>{r.label} · {rc?.name}</option>;
+          })}
+        </select>
+      </div>
+      {room ? (
+        <>
       <div className="rounded-xl bg-indigo-50/50 p-3 flex items-center gap-3">
         <BedDouble size={20} className="text-indigo-600" />
         <div>
@@ -848,10 +872,16 @@ function QuickBookingForm({
 
       <div className="flex justify-end gap-2 pt-2 border-t border-ink-100">
         <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm">{t('qb_cancel')}</button>
-        <button onClick={submit} disabled={!guest.trim()} className="btn-success px-4 py-2 text-sm">
+        <button onClick={submit} disabled={!guest.trim() || !selectedRoomId} className="btn-success px-4 py-2 text-sm">
           <Plus size={15} /> {t('qb_create')}
         </button>
       </div>
+      </>
+      ) : (
+        <div className="rounded-xl bg-ink-50 p-6 text-center text-sm text-ink-400">
+          {t('shax_selectRoom')}
+        </div>
+      )}
     </div>
   );
 }

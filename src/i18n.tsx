@@ -70,6 +70,7 @@ const uz: Dict = {
   shax_today: 'Bugun',
   shax_room: 'Xona',
   shax_legend: 'Holatlar',
+  shax_selectRoom: 'Xonani tanlang',
   // ---- Shaxmatka KPI widgets ----
   kpi_inhouse: 'Hozirda yashayotganlar',
   kpi_inhouse_guests: 'mehmon',
@@ -490,6 +491,7 @@ const ru: Dict = {
   shax_today: 'Сегодня',
   shax_room: 'Номер',
   shax_legend: 'Статусы',
+  shax_selectRoom: 'Выберите номер',
   kpi_inhouse: 'Нынешние гости',
   kpi_inhouse_guests: 'гостей',
   kpi_inhouse_capacity: 'загрузка',
@@ -884,6 +886,7 @@ const en: Dict = {
   shax_today: 'Today',
   shax_room: 'Room',
   shax_legend: 'Statuses',
+  shax_selectRoom: 'Select a room',
   kpi_inhouse: 'Currently In-house',
   kpi_inhouse_guests: 'guests',
   kpi_inhouse_capacity: 'capacity',

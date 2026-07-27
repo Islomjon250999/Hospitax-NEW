@@ -94,8 +94,8 @@ export function GroupBookingModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-ink-200/70 rounded-2xl shadow-float max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden">
         <div className="flex-shrink-0 flex items-center justify-between px-6 h-16 border-b border-ink-100">
           <h2 className="text-xl font-bold text-ink-900 flex items-center gap-2">
             <Users size={24} /> Guruhli Bron Qo'shish
