@@ -118,8 +118,8 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
       <div className="absolute inset-0 bg-ink-950/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${w} card p-6 animate-scale-in max-h-[90vh] overflow-y-auto`}>
-        <div className="flex items-center justify-between mb-4">
+      <div className={`relative w-full ${w} bg-white border border-ink-200/70 rounded-2xl shadow-float animate-scale-in flex flex-col max-h-[85vh]`}>
+        <div className="flex items-center justify-between px-6 h-16 border-b border-ink-100 shrink-0">
           <div className="flex items-center gap-2">
             {icon}
             <h3 className="text-base font-bold text-ink-900">{title}</h3>
@@ -128,7 +128,7 @@ export function Modal({
             <X size={16} />
           </button>
         </div>
-        {children}
+        <div className="flex-1 overflow-y-auto p-6">{children}</div>
       </div>
     </div>
   );

@@ -22,7 +22,6 @@ import { UZS, UZS_SHORT, formatDate, pct, type CurrencyLang } from '../../utils'
 import { Modal } from '../ui';
 import { useToast } from '../../toast';
 import { useLang } from '../../i18n';
-import { NewBookingModal } from './NewBookingModal';
 import { GroupBookingModal } from './GroupBookingModal';
 import { EditBookingModal } from './EditBookingModal';
 
@@ -216,7 +215,7 @@ export function Shaxmatka({
         {/* Rooms & Occupancy */}
         <div className="card p-5 group hover:shadow-float transition-all duration-200 relative overflow-hidden">
           <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-sky-50/60" />
-          <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full z-10">STATISTIKA</span>
+          <span className="absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full z-10">{t('admin_systemStatus')}</span>
           <div className="relative">
             <div className="h-11 w-11 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
               <BedDouble size={20} />
@@ -399,12 +398,12 @@ export function Shaxmatka({
                           const tariff = data.tariffs.find((tm) => tm.id === b.tariffId);
                           const tipId = `${room.id}-${b.id}`;
                           return (
-                            <div key={b.id} style={{ gridColumn: `${colStart} / ${colEnd}` }}>
+                            <div key={b.id} className="relative h-full" style={{ gridColumn: `${colStart} / ${colEnd}` }}>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setEditingBooking(b); }}
                                 onMouseEnter={() => setHovered(tipId)}
                                 onMouseLeave={() => setHovered(null)}
-                                className={`absolute top-1/2 left-1 right-1 -translate-y-1/2 h-10 rounded-md z-10 flex items-center px-3 ${st.bar} text-xs text-white font-medium shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
+                                className={`absolute inset-x-1 top-1/2 -translate-y-1/2 h-10 rounded-md z-10 flex items-center px-3 ${st.bar} text-xs text-white font-medium shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
                               >
                                 <span className="truncate">{b.guestName} — {t(st.labelKey)}</span>
                               </button>
@@ -475,30 +474,6 @@ export function Shaxmatka({
         )}
       </Modal>
 
-      {/* ---- New Booking Modal ---- */}
-      <NewBookingModal
-        open={quickBooking ? true : false}
-        onClose={() => setQuickBooking(null)}
-        roomId={quickBooking?.roomId}
-        dayOffset={quickBooking?.dayOffset}
-        rooms={data.rooms}
-        categories={data.categories}
-        tariffs={data.tariffs}
-        lang={lang}
-        onSubmit={(booking) => {
-          addBooking({
-            guestName: booking.guestName,
-            startOffset: booking.startOffset,
-            nights: booking.nights,
-            roomId: booking.roomId,
-            tariffId: booking.tariffId,
-            total: booking.total,
-            paymentStatus: booking.paymentStatus,
-          });
-          setQuickBooking(null);
-        }}
-      />
-
       {/* ---- Group Booking Modal ---- */}
       <GroupBookingModal
         open={groupBooking}
@@ -511,16 +486,20 @@ export function Shaxmatka({
           bookings.forEach((booking) => {
             addBooking({
               guestName: booking.guestName,
+              guestCountry: 'Uzbekistan',
               startOffset: booking.startOffset,
               nights: booking.nights,
+              status: 'Confirmed',
               roomId: booking.roomId,
+              channel: 'Direct',
+              phone: booking.phoneNumber || '+998 90 000 00 00',
               tariffId: booking.tariffId,
               total: booking.total,
               paymentStatus: booking.paymentStatus,
             });
           });
           setGroupBooking(false);
-          toast.success(`${bookings.length} ta bron qo'shildi!`);
+          toast(`${bookings.length} ${t('qb_create').toLowerCase()}`, 'success');
         }}
       />
 
@@ -553,7 +532,7 @@ export function Shaxmatka({
             bookings: data.bookings.map((b) => b.id === updatedBooking.id ? updatedBooking : b),
           });
           setEditingBooking(null);
-          toast.success('Bron yangilandi!');
+          toast(t('gen_save'), 'success');
         }}
       />
     </div>

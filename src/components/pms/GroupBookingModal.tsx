@@ -48,7 +48,7 @@ export function GroupBookingModal({
   const [notes, setNotes] = useState('');
 
   const selectedTariff = tariffs.find((t) => t.id === tariffId);
-  const nightly = selectedTariff?.pricePerNight || 0;
+  const nightly = selectedTariff?.dailyRate || 0;
   const totalPerRoom = nightly * nights;
   const totalAll = totalPerRoom * selectedRoomIds.length;
 
@@ -95,8 +95,8 @@ export function GroupBookingModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="card max-w-3xl w-full max-h-[90vh] flex flex-col bg-white rounded-xl overflow-hidden">
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-ink-100">
+      <div className="bg-white border border-ink-200/70 rounded-2xl shadow-float max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 flex items-center justify-between px-6 h-16 border-b border-ink-100">
           <h2 className="text-xl font-bold text-ink-900 flex items-center gap-2">
             <Users size={24} /> Guruhli Bron Qo'shish
           </h2>
@@ -213,7 +213,7 @@ export function GroupBookingModal({
                 <option value="">Tarifni tanlang...</option>
                 {tariffs.map((tariff) => (
                   <option key={tariff.id} value={tariff.id}>
-                    {tariff.name} - {UZS(tariff.pricePerNight, lang)}/tun
+                    {tariff.name} - {UZS(tariff.dailyRate, lang)}/tun
                   </option>
                 ))}
               </select>
@@ -258,7 +258,7 @@ export function GroupBookingModal({
           </div>
         </div>
 
-        <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 py-4 border-t border-ink-100 bg-white">
+        <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 h-16 border-t border-ink-100 bg-white">
           <button onClick={onClose} className="btn-secondary">
             Bekor qilish
           </button>

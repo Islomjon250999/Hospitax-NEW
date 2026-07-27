@@ -77,8 +77,8 @@ export function EditBookingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="card max-w-2xl w-full max-h-[90vh] flex flex-col bg-white rounded-xl overflow-hidden">
-        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-ink-100">
+      <div className="bg-white border border-ink-200/70 rounded-2xl shadow-float max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 flex items-center justify-between px-6 h-16 border-b border-ink-100">
           <h2 className="text-xl font-bold text-ink-900">Bronni Tahrirlash</h2>
           <button onClick={onClose} className="btn-ghost h-9 w-9 !p-0 flex items-center justify-center">
             <X size={20} />
@@ -195,7 +195,7 @@ export function EditBookingModal({
           </div>
         </div>
 
-        <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 py-4 border-t border-ink-100 bg-white">
+        <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 h-16 border-t border-ink-100 bg-white">
           <button onClick={onClose} className="btn-secondary">
             Bekor qilish
           </button>

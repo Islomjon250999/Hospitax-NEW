@@ -10,8 +10,8 @@ interface LangMeta {
 
 export const LANGUAGES: LangMeta[] = [
   { code: 'uz', label: "O'zbekcha", flag: '🇺🇿' },
-  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
   { code: 'en', label: 'ENG', flag: '🇬🇧' },
+  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
 ];
 
 type Dict = Record<string, string>;
