@@ -1,8 +1,9 @@
-import { useMemo, useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useMemo, useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
   CalendarDays,
+  Calendar,
   Plus,
   Search,
   Filter,
@@ -13,12 +14,13 @@ import {
   Trash2,
   TrendingUp,
   Users,
+  Baby,
   LogIn,
   LogOut,
   Eye,
 } from 'lucide-react';
-import type { Booking, BookingStatus, Room, RoomCategory, Tariff, ExtraService, RoomStatus } from '../../types';
-import { UZS, UZS_SHORT, formatDate, pct, type CurrencyLang } from '../../utils';
+import type { Booking, BookingGuest, BookingStatus, Room, RoomCategory, Tariff, ExtraService, RoomStatus } from '../../types';
+import { UZS, UZS_SHORT, formatDate, pct, todayISO, addDaysISO, nightsBetween, type CurrencyLang } from '../../utils';
 import { Modal } from '../ui';
 import { useToast } from '../../toast';
 import { useLang } from '../../i18n';
@@ -504,8 +506,8 @@ export function Shaxmatka({
         footer={
           quickBooking ? (
             <>
-              <button onClick={() => setQuickBooking(null)} className="btn-secondary">{t('qb_cancel')}</button>
-              <button onClick={() => quickBookingRef.current?.submit()} className="btn-success">
+              <button onClick={() => setQuickBooking(null)} className="btn-secondary px-5 py-2.5 text-sm">{t('qb_cancel')}</button>
+              <button onClick={() => quickBookingRef.current?.submit()} className="btn-success px-5 py-2.5 text-sm">
                 <Plus size={15} /> {t('qb_create')}
               </button>
             </>
@@ -549,6 +551,9 @@ export function Shaxmatka({
               tariffId: booking.tariffId,
               total: booking.total,
               paymentStatus: booking.paymentStatus,
+              adults: booking.adults,
+              children: booking.children,
+              guests: booking.guests,
             });
           });
           setGroupBooking(false);
@@ -846,7 +851,8 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
   const { lang, t } = useLang();
   const [selectedRoomId, setSelectedRoomId] = useState(roomId);
   const [guest, setGuest] = useState('');
-  const [nights, setNights] = useState(initNights > 0 ? initNights : 1);
+  const [checkIn, setCheckIn] = useState(addDaysISO(todayISO(), dayOffset));
+  const [checkOut, setCheckOut] = useState(addDaysISO(addDaysISO(todayISO(), dayOffset), initNights > 0 ? initNights : 1));
   const [country, setCountry] = useState('Uzbekistan');
   const [channel, setChannel] = useState('Direct');
   const [phone, setPhone] = useState('');
@@ -859,16 +865,43 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
   const [status, setStatus] = useState<BookingStatus>('Confirmed');
   const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Partial' | 'Unpaid'>('Unpaid');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
+  const [guestNames, setGuestNames] = useState<BookingGuest[]>([]);
+
+  const nights = nightsBetween(checkIn, checkOut);
 
   const room = rooms.find((r) => r.id === selectedRoomId);
   const cat = room ? categories.find((c) => c.id === room.categoryId) : undefined;
   const roomTariffs = room ? tariffs.filter((tm) => tm.categoryId === room.categoryId) : [];
+  const maxAdults = cat?.maxAdults ?? 10;
+  const maxChildren = cat?.maxChildren ?? 10;
 
   const handleRoomChange = (newRoomId: string) => {
     setSelectedRoomId(newRoomId);
     const newRoom = rooms.find((r) => r.id === newRoomId);
     const newTariffs = newRoom ? tariffs.filter((tm) => tm.categoryId === newRoom.categoryId) : [];
     setTariffId(newTariffs[0]?.id ?? '');
+  };
+
+  // Sync guest name fields when adult/child counts change
+  useEffect(() => {
+    setGuestNames((prev) => {
+      const target = adults + children;
+      if (prev.length === target) return prev.map((g, i) => ({ ...g, type: i < adults ? 'adult' as const : 'child' as const }));
+      const next = [...prev];
+      while (next.length < target) {
+        const idx = next.length;
+        next.push({ name: idx === 0 ? guest : '', type: idx < adults ? 'adult' : 'child' });
+      }
+      while (next.length > target) next.pop();
+      return next.map((g, i) => ({ ...g, type: i < adults ? 'adult' as const : 'child' as const }));
+    });
+  }, [adults, children]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleGuestNameChange = (idx: number, name: string) => {
+    setGuestNames((prev) => prev.map((g, i) => (i === idx ? { ...g, name } : g)));
+    if (idx === 0) setGuest(name);
   };
 
   const tariff = tariffs.find((tm) => tm.id === tariffId);
@@ -882,12 +915,13 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
     setSelectedServices((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const submit = () => {
-    if (!guest.trim() || !selectedRoomId) return;
+    if (!guest.trim() || !selectedRoomId || nights <= 0) return;
+    const startOffset = Math.round((new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000);
     onAdd({
       roomId: selectedRoomId,
       guestName: guest.trim(),
       guestCountry: country,
-      startOffset: dayOffset,
+      startOffset,
       nights,
       status,
       total,
@@ -896,10 +930,13 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
       tariffId: tariffId || undefined,
       paymentStatus,
       serviceIds: selectedServices,
+      adults,
+      children,
+      guests: guestNames,
     });
   };
 
-  useImperativeHandle(ref, () => ({ submit }), [guest, selectedRoomId, country, dayOffset, nights, status, total, channel, phone, tariffId, paymentStatus, selectedServices]);
+  useImperativeHandle(ref, () => ({ submit }), [guest, selectedRoomId, country, checkIn, checkOut, nights, status, total, channel, phone, tariffId, paymentStatus, selectedServices, adults, children, guestNames]);
 
   return (
     <div className="space-y-4">
@@ -926,11 +963,19 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">
           <label className="label">{t('qb_guest')}</label>
-          <input value={guest} onChange={(e) => setGuest(e.target.value)} placeholder={t('qb_guestPh')} className="input" autoFocus />
+          <input value={guest} onChange={(e) => { setGuest(e.target.value); handleGuestNameChange(0, e.target.value); }} placeholder={t('qb_guestPh')} className="input" autoFocus />
+        </div>
+        <div>
+          <label className="label"><span className="inline-flex items-center gap-1.5"><Calendar size={12} className="text-indigo-500" />{t('eb_checkInDate')}</span></label>
+          <input type="date" value={checkIn} onChange={(e) => { const v = e.target.value; if (v >= checkOut) setCheckOut(addDaysISO(v, 1)); setCheckIn(v); }} className="input" />
+        </div>
+        <div>
+          <label className="label"><span className="inline-flex items-center gap-1.5"><Calendar size={12} className="text-indigo-500" />{t('eb_checkOutDate')}</span></label>
+          <input type="date" value={checkOut} min={addDaysISO(checkIn, 1)} onChange={(e) => { if (e.target.value > checkIn) setCheckOut(e.target.value); }} className="input" />
         </div>
         <div>
           <label className="label">{t('qb_nights')}</label>
-          <input type="number" min={1} value={nights} onChange={(e) => setNights(Number(e.target.value))} className="input" />
+          <div className="input flex items-center justify-center font-bold text-indigo-600 tabular">{nights} {t('eb_nightsCalc')}</div>
         </div>
         <div>
           <label className="label">{t('qb_country')}</label>
@@ -968,6 +1013,36 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 90 123 45 67" className="input" />
         </div>
       </div>
+
+      {/* Adult & Child counters */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="label"><span className="inline-flex items-center gap-1.5"><Users size={12} className="text-ink-400" />{t('eb_adults')}</span></label>
+          <input type="number" min={1} max={maxAdults} value={adults} onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))} className="input" />
+        </div>
+        <div>
+          <label className="label"><span className="inline-flex items-center gap-1.5"><Baby size={12} className="text-ink-400" />{t('eb_children')}</span></label>
+          <input type="number" min={0} max={maxChildren} value={children} onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))} className="input" />
+        </div>
+      </div>
+
+      {/* Dynamic guest name fields */}
+      {(adults + children) > 1 && (
+        <div>
+          <label className="label">{t('eb_guestNames')}</label>
+          <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
+            {guestNames.map((g, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${g.type === 'adult' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
+                  {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
+                  {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
+                </span>
+                <input type="text" value={g.name} onChange={(e) => handleGuestNameChange(idx, e.target.value)} placeholder={t('eb_guestNamePh')} className="input flex-1 !py-1.5 !text-xs" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="label">{t('qb_addonServices')}</label>

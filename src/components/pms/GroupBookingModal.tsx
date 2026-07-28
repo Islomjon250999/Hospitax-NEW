@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { X, Phone, Mail, Users } from 'lucide-react';
-import type { Room, RoomCategory, Tariff } from '../../types';
-import { UZS } from '../../utils';
+import { useState, useEffect } from 'react';
+import { X, Phone, Mail, Users, Baby, Calendar } from 'lucide-react';
+import type { Room, RoomCategory, Tariff, BookingGuest } from '../../types';
+import { UZS, todayISO, addDaysISO, nightsBetween } from '../../utils';
 import { useLang } from '../../i18n';
 import type { CurrencyLang } from '../../utils';
 
@@ -23,6 +23,9 @@ interface GroupBookingModalProps {
     total: number;
     paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
     notes?: string;
+    adults: number;
+    children: number;
+    guests: BookingGuest[];
   }>) => void;
 }
 
@@ -41,16 +44,48 @@ export function GroupBookingModal({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
-  const [nights, setNights] = useState(1);
-  const [startOffset, setStartOffset] = useState(0);
+  const [checkIn, setCheckIn] = useState(todayISO());
+  const [checkOut, setCheckOut] = useState(addDaysISO(todayISO(), 1));
   const [tariffId, setTariffId] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Partial' | 'Unpaid'>('Unpaid');
   const [notes, setNotes] = useState('');
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
+  const [guestNames, setGuestNames] = useState<BookingGuest[]>([]);
+
+  const nights = nightsBetween(checkIn, checkOut);
 
   const selectedTariff = tariffs.find((tm) => tm.id === tariffId);
   const nightly = selectedTariff?.dailyRate || 0;
   const totalPerRoom = nightly * nights;
   const totalAll = totalPerRoom * selectedRoomIds.length;
+
+  // Determine max capacity from the first selected room's category
+  const firstSelectedRoom = rooms.find((r) => r.id === selectedRoomIds[0]);
+  const selectedCategory = categories.find((c) => c.id === firstSelectedRoom?.categoryId);
+  const maxAdults = selectedCategory?.maxAdults ?? 10;
+  const maxChildren = selectedCategory?.maxChildren ?? 10;
+
+  // Sync guest name fields when adult/child counts change
+  useEffect(() => {
+    setGuestNames((prev) => {
+      const target = adults + children;
+      if (prev.length === target)
+        return prev.map((g, i) => ({ ...g, type: i < adults ? 'adult' as const : 'child' as const }));
+      const next = [...prev];
+      while (next.length < target) {
+        const idx = next.length;
+        next.push({ name: idx === 0 ? leadGuestName : '', type: idx < adults ? 'adult' : 'child' });
+      }
+      while (next.length > target) next.pop();
+      return next.map((g, i) => ({ ...g, type: i < adults ? 'adult' as const : 'child' as const }));
+    });
+  }, [adults, children]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleGuestNameChange = (idx: number, name: string) => {
+    setGuestNames((prev) => prev.map((g, i) => (i === idx ? { ...g, name } : g)));
+    if (idx === 0) setLeadGuestName(name);
+  };
 
   const toggleRoom = (roomId: string) => {
     setSelectedRoomIds((prev) =>
@@ -63,6 +98,10 @@ export function GroupBookingModal({
       return;
     }
 
+    const startOffset = Math.round(
+      (new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000,
+    );
+
     const bookings = selectedRoomIds.map((roomId) => ({
       guestName: `${groupName} - Xona ${rooms.find((r) => r.id === roomId)?.label}`,
       phoneNumber,
@@ -74,6 +113,9 @@ export function GroupBookingModal({
       total: totalPerRoom,
       paymentStatus,
       notes: notes || undefined,
+      adults,
+      children,
+      guests: guestNames,
     }));
 
     onSubmit(bookings);
@@ -83,11 +125,14 @@ export function GroupBookingModal({
     setPhoneNumber('');
     setEmail('');
     setSelectedRoomIds([]);
-    setNights(1);
-    setStartOffset(0);
+    setCheckIn(todayISO());
+    setCheckOut(addDaysISO(todayISO(), 1));
     setTariffId('');
     setPaymentStatus('Unpaid');
     setNotes('');
+    setAdults(1);
+    setChildren(0);
+    setGuestNames([]);
     onClose();
   };
 
@@ -108,7 +153,7 @@ export function GroupBookingModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
           {/* Group Information */}
           <div>
             <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_groupName')} *</label>
@@ -126,7 +171,10 @@ export function GroupBookingModal({
             <input
               type="text"
               value={leadGuestName}
-              onChange={(e) => setLeadGuestName(e.target.value)}
+              onChange={(e) => {
+                setLeadGuestName(e.target.value);
+                handleGuestNameChange(0, e.target.value);
+              }}
               placeholder={t('gb_leadGuestPh')}
               className="input w-full"
             />
@@ -188,39 +236,131 @@ export function GroupBookingModal({
             </div>
           </div>
 
-          {/* Booking Details */}
+          {/* Check-in / Check-out Date Pickers */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar size={14} className="text-indigo-500" />
+                  {t('eb_checkInDate')}
+                </span>
+              </label>
+              <input
+                type="date"
+                value={checkIn}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v >= checkOut) setCheckOut(addDaysISO(v, 1));
+                  setCheckIn(v);
+                }}
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar size={14} className="text-indigo-500" />
+                  {t('eb_checkOutDate')}
+                </span>
+              </label>
+              <input
+                type="date"
+                value={checkOut}
+                min={addDaysISO(checkIn, 1)}
+                onChange={(e) => {
+                  if (e.target.value > checkIn) setCheckOut(e.target.value);
+                }}
+                className="input w-full"
+              />
+            </div>
+          </div>
+
+          {/* Nights summary + Tariff */}
           <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_checkInOffset')}</label>
-              <input
-                type="number"
-                value={startOffset}
-                onChange={(e) => setStartOffset(Math.max(0, parseInt(e.target.value) || 0))}
-                className="input w-full"
-              />
+            <div className="rounded-xl bg-indigo-50 px-4 py-3 flex flex-col justify-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-400">{t('eb_nights')}</p>
+              <p className="text-lg font-extrabold text-indigo-700 tabular leading-tight mt-0.5">
+                {nights} <span className="text-xs font-medium text-indigo-400">{t('eb_nightsCalc')}</span>
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_nights')} *</label>
-              <input
-                type="number"
-                min="1"
-                value={nights}
-                onChange={(e) => setNights(Math.max(1, parseInt(e.target.value) || 1))}
-                className="input w-full"
-              />
-            </div>
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_tariff')} *</label>
               <select value={tariffId} onChange={(e) => setTariffId(e.target.value)} className="input w-full">
                 <option value="">{t('gb_selectTariff')}</option>
                 {tariffs.map((tariff) => (
                   <option key={tariff.id} value={tariff.id}>
-                    {tariff.name} - {UZS(tariff.dailyRate, lang)}/tun
+                    {tariff.name} - {UZS(tariff.dailyRate, lang)}/{t('eb_nightsCalc')}
                   </option>
                 ))}
               </select>
             </div>
           </div>
+
+          {/* Adult & Child counters */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users size={14} className="text-ink-400" />
+                  {t('eb_adults')}
+                </span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={maxAdults}
+                value={adults}
+                onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))}
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Baby size={14} className="text-ink-400" />
+                  {t('eb_children')}
+                </span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={maxChildren}
+                value={children}
+                onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))}
+                className="input w-full"
+              />
+            </div>
+          </div>
+
+          {/* Dynamic guest name fields */}
+          {(adults + children) > 1 && (
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_guestNames')}</label>
+              <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
+                {guestNames.map((g, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span
+                      className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${
+                        g.type === 'adult'
+                          ? 'bg-indigo-100 text-indigo-600'
+                          : 'bg-amber-100 text-amber-600'
+                      }`}
+                    >
+                      {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
+                      {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
+                    </span>
+                    <input
+                      type="text"
+                      value={g.name}
+                      onChange={(e) => handleGuestNameChange(idx, e.target.value)}
+                      placeholder={t('eb_guestNamePh')}
+                      className="input flex-1 !py-1.5 !text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Pricing Summary */}
           {selectedRoomIds.length > 0 && (
@@ -260,14 +400,15 @@ export function GroupBookingModal({
           </div>
         </div>
 
-        <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 h-16 border-t border-ink-100 bg-white">
-          <button onClick={onClose} className="btn-secondary">
+        {/* Fixed footer with proper padding, spacing, and border */}
+        <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 py-4 border-t border-ink-100 bg-white">
+          <button onClick={onClose} className="btn-secondary px-5 py-2.5 text-sm">
             {t('gb_cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!leadGuestName || !groupName || selectedRoomIds.length === 0 || !tariffId || nights <= 0}
-            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {selectedRoomIds.length > 0
               ? `${selectedRoomIds.length} — ${t('gb_create')}`
