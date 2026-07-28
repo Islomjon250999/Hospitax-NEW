@@ -78,7 +78,7 @@ export function Shaxmatka({
   const [startOffset, setStartOffset] = useState(0);
   const _lang = lang as CurrencyLang;
   const [selected, setSelected] = useState<Booking | null>(null);
-  const [quickBooking, setQuickBooking] = useState<{ roomId: string; dayOffset: number } | null>(null);
+  const [quickBooking, setQuickBooking] = useState<{ roomId: string; dayOffset: number; nights: number } | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -90,6 +90,7 @@ export function Shaxmatka({
   const [dragEnd, setDragEnd] = useState<{ roomId: string; dayOffset: number } | null>(null);
   const [groupBooking, setGroupBooking] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [statusMenuRoomId, setStatusMenuRoomId] = useState<string | null>(null);
   const quickBookingRef = useRef<{ submit: () => void } | null>(null);
   const toast = useToast();
 
@@ -174,6 +175,11 @@ export function Shaxmatka({
     setSelected(null);
     toast(t('bd_cancel'), 'info');
   };
+
+  const isCellOccupied = (roomId: string, dayOffset: number) =>
+    data.bookings.some(
+      (b) => b.roomId === roomId && b.startOffset <= dayOffset && dayOffset < b.startOffset + b.nights,
+    );
 
   const roomStatusDot = (status: Room['status']) => {
     const map: Record<string, string> = {
@@ -288,7 +294,7 @@ export function Shaxmatka({
         </div>
         <div className="flex items-center gap-2 flex-wrap ml-auto">
           <button
-            onClick={() => setQuickBooking({ roomId: '', dayOffset: 0 })}
+            onClick={() => setQuickBooking({ roomId: '', dayOffset: 0, nights: 1 })}
             className="inline-flex items-center gap-1.5 px-3 h-9 text-xs font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-500 transition-colors whitespace-nowrap"
           >
             <Plus size={14} /> {t('qb_title')}
@@ -318,9 +324,9 @@ export function Shaxmatka({
         </div>
 
         <div className="overflow-x-auto grid-no-scrollbar">
-          <div className="min-w-[960px]">
+          <div className="min-w-[1000px]">
             {/* header row */}
-            <div className="grid sticky top-0 z-20 bg-white" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)` }}>
+            <div className="grid sticky top-0 z-20 bg-white" style={{ gridTemplateColumns: `240px repeat(${DAYS}, 1fr)` }}>
               <div className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-400 border-r border-ink-100 sticky left-0 z-10 bg-white">
                 {t('shax_room')}
               </div>
@@ -335,7 +341,7 @@ export function Shaxmatka({
             {/* grouped room rows */}
             {groupedRooms.map(({ category, rooms: catRooms }) => (
               <div key={category.id}>
-                <div className="grid bg-ink-50/60 border-y border-ink-100" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)` }}>
+                <div className="grid bg-ink-50/60 border-y border-ink-100" style={{ gridTemplateColumns: `240px repeat(${DAYS}, 1fr)` }}>
                   <div className="px-4 py-2 sticky left-0 z-10 bg-ink-50/60 flex items-center gap-2 border-r border-ink-100">
                     <Filter size={12} className="text-indigo-500" />
                     <span className="text-xs font-bold text-ink-700">{category.name}</span>
@@ -351,31 +357,46 @@ export function Shaxmatka({
                   const laneBlockH = count > 0 ? count * BAR_H + (count - 1) * BAR_GAP : 0;
                   const laneOffset = (rowH - laneBlockH) / 2;
                   return (
-                    <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)`, height: `${rowH}px` }}>
-                      <div className="sticky left-0 z-10 bg-inherit px-4 border-r border-ink-100 flex items-center justify-between gap-2">
+                    <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `240px repeat(${DAYS}, 1fr)`, height: `${rowH}px` }}>
+                      <div className="sticky left-0 z-10 bg-inherit px-3 border-r border-ink-100 flex items-center gap-2">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <BedDouble size={14} className="text-ink-400 shrink-0" />
-                          <span className="text-sm font-semibold text-ink-800 truncate">{room.label}</span>
-                          <span className="text-xs text-ink-400 shrink-0">•</span>
-                          <span className="text-xs font-medium text-ink-600 truncate">{category.name}</span>
+                          <span className="text-sm font-semibold text-ink-800 whitespace-nowrap">{room.label}</span>
+                          <span className="text-xs text-ink-300 shrink-0">·</span>
+                          <span className="text-xs font-medium text-ink-500 truncate">{category.name}</span>
                         </div>
-                        <div className="relative">
+                        <div className="relative shrink-0">
                           <button
                             className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-ink-100 transition-colors text-xs font-medium"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const currentIndex = ['Clean', 'Dirty', 'Inspected', 'Maintenance'].indexOf(room.status);
-                              const nextStatus = ['Clean', 'Dirty', 'Inspected', 'Maintenance'][(currentIndex + 1) % 4] as RoomStatus;
-                              onUpdateData({
-                                ...data,
-                                rooms: data.rooms.map((r) => r.id === room.id ? { ...r, status: nextStatus } : r),
-                              });
+                              setStatusMenuRoomId(statusMenuRoomId === room.id ? null : room.id);
                             }}
-                            title={t('rt_clickToCycle')}
                           >
                             {roomStatusDot(room.status)}
-                            <span className="text-[10px] text-ink-500">{t(`room_${room.status.toLowerCase()}`)}</span>
+                            <span className="text-[10px] text-ink-500 hidden lg:inline">{t(`room_${room.status.toLowerCase()}`)}</span>
                           </button>
+                          {statusMenuRoomId === room.id && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setStatusMenuRoomId(null); }} />
+                              <div className="absolute right-0 top-full mt-1 z-50 w-36 card p-1.5 shadow-float animate-scale-in">
+                                {(['Clean', 'Dirty', 'Inspected', 'Maintenance'] as RoomStatus[]).map((s) => (
+                                  <button
+                                    key={s}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onUpdateData({ rooms: data.rooms.map((r) => r.id === room.id ? { ...r, status: s } : r) });
+                                      setStatusMenuRoomId(null);
+                                    }}
+                                    className={`flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${room.status === s ? 'bg-ink-100 text-ink-900' : 'text-ink-600 hover:bg-ink-50'}`}
+                                  >
+                                    {roomStatusDot(s)}
+                                    {t(`room_${s.toLowerCase()}`)}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div className="relative w-full" style={{ gridColumn: '2 / -1', display: 'grid', gridTemplateColumns: `repeat(${DAYS}, 1fr)` }}>
@@ -388,9 +409,12 @@ export function Shaxmatka({
                           return (
                             <button
                               key={i}
-                              onMouseDown={() => setDragStart({ roomId: room.id, dayOffset })}
+                              onMouseDown={() => {
+                                if (isCellOccupied(room.id, dayOffset)) return;
+                                setDragStart({ roomId: room.id, dayOffset });
+                              }}
                               onMouseEnter={() => {
-                                if (dragStart?.roomId === room.id) {
+                                if (dragStart?.roomId === room.id && !isCellOccupied(room.id, dayOffset)) {
                                   setDragEnd({ roomId: room.id, dayOffset });
                                 }
                               }}
@@ -398,7 +422,7 @@ export function Shaxmatka({
                                 if (dragStart && dragEnd && dragStart.roomId === room.id) {
                                   const checkIn = Math.min(dragStart.dayOffset, dragEnd.dayOffset);
                                   const checkOut = Math.max(dragStart.dayOffset, dragEnd.dayOffset) + 1;
-                                  setQuickBooking({ roomId: room.id, dayOffset: checkIn });
+                                  setQuickBooking({ roomId: room.id, dayOffset: checkIn, nights: checkOut - checkIn });
                                   setTimeout(() => {
                                     setDragStart(null);
                                     setDragEnd(null);
@@ -406,14 +430,17 @@ export function Shaxmatka({
                                 }
                               }}
                               onClick={() => {
-                                setQuickBooking({ roomId: room.id, dayOffset });
+                                if (isCellOccupied(room.id, dayOffset)) return;
+                                setQuickBooking({ roomId: room.id, dayOffset, nights: 1 });
                                 setDragStart(null);
                                 setDragEnd(null);
                               }}
-                              className={`relative overflow-hidden z-0 border-r border-ink-50 cursor-pointer transition-colors h-full ${
-                                i === todayIndex ? 'bg-indigo-50/20' : ''
-                              } ${
-                                isInSelection ? 'bg-indigo-100/60' : 'hover:bg-indigo-50/40'
+                              className={`relative overflow-hidden z-0 border-r border-ink-50 transition-colors h-full ${
+                                isCellOccupied(room.id, dayOffset)
+                                  ? 'cursor-not-allowed bg-ink-50/20'
+                                  : `cursor-pointer ${i === todayIndex ? 'bg-indigo-50/20' : ''} ${
+                                      isInSelection ? 'bg-indigo-100/60' : 'hover:bg-indigo-50/40'
+                                    }`
                               }`}
                               aria-label={`Book room ${room.label} on day ${dayOffset}`}
                             />
@@ -445,7 +472,7 @@ export function Shaxmatka({
                                   <span className="truncate">{b.guestName} — {t(st.labelKey)}</span>
                                 </button>
                                 {hovered === tipId && (
-                                  <div className="absolute z-50 mt-1 left-0 w-60 card p-3 shadow-float animate-scale-in text-left pointer-events-none" style={{ top: '100%' }}>
+                                  <div className="absolute z-50 left-0 w-64 card p-3.5 shadow-float animate-scale-in text-left pointer-events-none" style={lane < count / 2 ? { top: '100%', marginTop: '6px' } : { bottom: '100%', marginBottom: '6px' }}>
                                     <div className="flex items-center justify-between mb-2">
                                       <p className="text-sm font-bold text-ink-900">{b.guestName}</p>
                                       <span className={`chip ${st.chip}`}>{t(st.labelKey)}</span>
@@ -513,6 +540,7 @@ export function Shaxmatka({
             ref={quickBookingRef}
             roomId={quickBooking.roomId}
             dayOffset={quickBooking.dayOffset}
+            nights={quickBooking.nights}
             rooms={data.rooms}
             tariffs={data.tariffs}
             services={data.services}
@@ -747,6 +775,7 @@ function BookingDetail({
 const QuickBookingForm = forwardRef<{ submit: () => void }, {
   roomId: string;
   dayOffset: number;
+  nights: number;
   rooms: Room[];
   tariffs: Tariff[];
   services: ExtraService[];
@@ -760,11 +789,12 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
   services,
   categories,
   onAdd,
+  nights: initNights,
 }, ref) {
   const { lang, t } = useLang();
   const [selectedRoomId, setSelectedRoomId] = useState(roomId);
   const [guest, setGuest] = useState('');
-  const [nights, setNights] = useState(2);
+  const [nights, setNights] = useState(initNights > 0 ? initNights : 1);
   const [country, setCountry] = useState('Uzbekistan');
   const [channel, setChannel] = useState('Direct');
   const [phone, setPhone] = useState('');
