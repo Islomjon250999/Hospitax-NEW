@@ -27,6 +27,33 @@ import { EditBookingModal } from './EditBookingModal';
 
 const DAYS = 14;
 
+const BAR_H = 32;
+const BAR_GAP = 4;
+const BAR_PAD = 6;
+
+function assignLanes(bookings: Booking[]): Map<string, number> {
+  const sorted = [...bookings].sort((a, b) => a.startOffset - b.startOffset);
+  const laneEnds: number[] = [];
+  const result = new Map<string, number>();
+  for (const b of sorted) {
+    const end = b.startOffset + b.nights;
+    let lane = -1;
+    for (let i = 0; i < laneEnds.length; i++) {
+      if (laneEnds[i] <= b.startOffset) {
+        laneEnds[i] = end;
+        lane = i;
+        break;
+      }
+    }
+    if (lane === -1) {
+      laneEnds.push(end);
+      lane = laneEnds.length - 1;
+    }
+    result.set(b.id, lane);
+  }
+  return result;
+}
+
 let bookingCounter = 200;
 
 interface PmsData {
@@ -316,8 +343,10 @@ export function Shaxmatka({
 
                 {catRooms.map((room) => {
                   const roomBookings = visibleBookings.filter((b) => b.roomId === room.id);
+                  const laneMap = assignLanes(roomBookings);
+                  const roomBookingsLanes = roomBookings.length > 0 ? Math.max(...roomBookings.map((b) => (laneMap.get(b.id) ?? 0) + 1)) : 1;
                   return (
-                    <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)`, height: '56px' }}>
+                    <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)`, height: `${Math.max(56, roomBookingsLanes * (BAR_H + BAR_GAP) + BAR_PAD * 2)}px` }}>
                       <div className="sticky left-0 z-10 bg-inherit px-4 py-2.5 border-r border-ink-100 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <BedDouble size={14} className="text-ink-400 shrink-0" />
@@ -404,7 +433,8 @@ export function Shaxmatka({
                                 onClick={(e) => { e.stopPropagation(); setEditingBooking(b); }}
                                 onMouseEnter={() => setHovered(tipId)}
                                 onMouseLeave={() => setHovered(null)}
-                                className={`absolute inset-x-1 top-1/2 -translate-y-1/2 h-10 rounded-md z-10 flex items-center px-3 ${st.bar} text-xs text-white font-medium shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
+                                className={`absolute inset-x-1 z-10 flex items-center px-3 py-1.5 ${st.bar} text-xs text-white font-medium rounded-lg shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
+                                style={{ top: `${BAR_PAD + (laneMap.get(b.id) ?? 0) * (BAR_H + BAR_GAP)}px`, height: `${BAR_H}px` }}
                               >
                                 <span className="truncate">{b.guestName} — {t(st.labelKey)}</span>
                               </button>
