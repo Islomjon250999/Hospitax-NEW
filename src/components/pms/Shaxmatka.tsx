@@ -96,6 +96,7 @@ export function Shaxmatka({
   const [groupBooking, setGroupBooking] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [statusMenuRoomId, setStatusMenuRoomId] = useState<string | null>(null);
+  const [statusMenuAnchor, setStatusMenuAnchor] = useState<DOMRect | null>(null);
   const quickBookingRef = useRef<{ submit: () => void } | null>(null);
   const toast = useToast();
 
@@ -370,41 +371,26 @@ export function Shaxmatka({
                           <span className="text-xs text-ink-300 shrink-0">·</span>
                           <span className="text-xs font-medium text-ink-500 truncate">{category.name}</span>
                         </div>
-                        <div className="relative shrink-0">
+                        <div className="shrink-0">
                           <button
                             className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-ink-100 transition-colors text-xs font-medium"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setStatusMenuRoomId(statusMenuRoomId === room.id ? null : room.id);
+                              if (statusMenuRoomId === room.id) {
+                                setStatusMenuRoomId(null);
+                                setStatusMenuAnchor(null);
+                              } else {
+                                setStatusMenuAnchor(e.currentTarget.getBoundingClientRect());
+                                setStatusMenuRoomId(room.id);
+                              }
                             }}
                           >
                             {roomStatusDot(room.status)}
                             <span className="text-[10px] text-ink-500 hidden lg:inline">{t(`room_${room.status.toLowerCase()}`)}</span>
                           </button>
-                          {statusMenuRoomId === room.id && (
-                            <>
-                              <div className="fixed inset-0 z-[55]" onClick={(e) => { e.stopPropagation(); setStatusMenuRoomId(null); }} />
-                              <div className="absolute right-0 top-full mt-1 z-[60] w-36 card p-1.5 shadow-float animate-scale-in">
-                                {(['Clean', 'Dirty', 'Inspected', 'Maintenance'] as RoomStatus[]).map((s) => (
-                                  <button
-                                    key={s}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onUpdateData({ rooms: data.rooms.map((r) => r.id === room.id ? { ...r, status: s } : r) });
-                                      setStatusMenuRoomId(null);
-                                    }}
-                                    className={`flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${room.status === s ? 'bg-ink-100 text-ink-900' : 'text-ink-600 hover:bg-ink-50'}`}
-                                  >
-                                    {roomStatusDot(s)}
-                                    {t(`room_${s.toLowerCase()}`)}
-                                  </button>
-                                ))}
-                              </div>
-                            </>
-                          )}
                         </div>
                       </div>
-                      <div className="relative w-full" style={{ gridColumn: '2 / -1', display: 'grid', gridTemplateColumns: `repeat(${DAYS}, 1fr)` }}>
+                      <div className="relative w-full" style={{ gridColumn: '2 / -1', display: 'grid', gridTemplateColumns: `repeat(${DAYS}, 1fr)`, gridTemplateRows: '100%', overflow: 'hidden' }}>
                         {days.map((_, i) => {
                           const dayOffset = startOffset + i;
                           const isInSelection = dragStart && dragEnd && 
@@ -414,6 +400,7 @@ export function Shaxmatka({
                           return (
                             <button
                               key={i}
+                              style={{ gridColumn: i + 1, gridRow: 1 }}
                               onMouseDown={() => {
                                 if (isCellOccupied(room.id, dayOffset)) return;
                                 setDragStart({ roomId: room.id, dayOffset });
@@ -465,7 +452,7 @@ export function Shaxmatka({
                           const tariff = data.tariffs.find((tm) => tm.id === b.tariffId);
                           const lane = lanes.get(b.id) ?? 0;
                           return (
-                            <div key={b.id} className="relative h-full" style={{ gridColumn: `${colStart} / span ${span}` }}>
+                            <div key={b.id} className="relative h-full" style={{ gridColumn: `${colStart} / span ${span}`, gridRow: 1 }}>
                               <div className="absolute inset-x-1 z-10" style={{ top: `${laneOffset + lane * (BAR_H + BAR_GAP)}px`, height: `${BAR_H}px` }}>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setHoveredTip(null); setEditingBooking(b); }}
@@ -602,6 +589,48 @@ export function Shaxmatka({
           toast(t('gen_save'), 'success');
         }}
       />
+
+      {statusMenuRoomId && statusMenuAnchor && (() => {
+        const room = data.rooms.find((r) => r.id === statusMenuRoomId);
+        if (!room) return null;
+        const menuW = 160;
+        const left = Math.max(8, Math.min(statusMenuAnchor.right - menuW, window.innerWidth - menuW - 8));
+        const showBelow = statusMenuAnchor.bottom + 180 < window.innerHeight;
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-[55]"
+              onClick={() => { setStatusMenuRoomId(null); setStatusMenuAnchor(null); }}
+            />
+            <div
+              className="fixed z-[60] w-40 card p-1.5 shadow-float animate-scale-in"
+              style={{
+                left: `${left}px`,
+                top: showBelow ? `${statusMenuAnchor.bottom + 4}px` : undefined,
+                bottom: showBelow ? undefined : `${window.innerHeight - statusMenuAnchor.top + 4}px`,
+              }}
+            >
+              {(['Clean', 'Dirty', 'Inspected', 'Maintenance'] as RoomStatus[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateData({ rooms: data.rooms.map((r) => r.id === room.id ? { ...r, status: s } : r) });
+                    setStatusMenuRoomId(null);
+                    setStatusMenuAnchor(null);
+                  }}
+                  className={`flex items-center gap-2 w-full px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    room.status === s ? 'bg-ink-100 text-ink-900' : 'text-ink-600 hover:bg-ink-50'
+                  }`}
+                >
+                  {roomStatusDot(s)}
+                  {t(`room_${s.toLowerCase()}`)}
+                </button>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
       {hoveredTip && (() => {
         const b = hoveredTip.booking;
