@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import type { ViewMode } from '../types';
 import { notifications as seedNotifs } from '../mockData';
-import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel, Avatar, SlideOver } from './ui';
+import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel, Avatar, SlideOver, FlagIcon } from './ui';
 import { useToast } from '../toast';
 import { useLang, LANGUAGES } from '../i18n';
 
@@ -126,11 +126,10 @@ export function AppShell({
 
             {/* Language selector */}
             <Dropdown
-              width="w-48"
+              width="w-52"
               trigger={
-                <button className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl hover:bg-ink-100 transition-colors text-sm font-semibold text-ink-700">
-                  <Globe size={16} className="text-ink-400" />
-                  <span className="text-xl leading-none">{LANGUAGES.find((l) => l.code === lang)?.flag}</span>
+                <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-ink-100 transition-colors text-sm font-semibold text-ink-700">
+                  <FlagIcon code={lang} size="sm" />
                   <span className="text-xs font-bold tracking-wide">{LANGUAGES.find((l) => l.code === lang)?.label}</span>
                   <ChevronDown size={13} className="text-ink-400" />
                 </button>
@@ -143,12 +142,12 @@ export function AppShell({
                     <button
                       key={l.code}
                       onClick={() => { setLang(l.code); close(); toast(l.label, 'info'); }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
                         lang === l.code ? 'bg-indigo-50 text-indigo-700' : 'text-ink-700 hover:bg-ink-100'
                       }`
                     }
                     >
-                      <span className="text-xl leading-none">{l.flag}</span>
+                      <FlagIcon code={l.code} size="sm" />
                       <span className="flex-1">{l.label}</span>
                       {lang === l.code && <Check size={14} className="text-indigo-600" />}
                     </button>

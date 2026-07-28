@@ -103,6 +103,7 @@ export function Modal({
   onClose,
   title,
   children,
+  footer,
   size = 'md',
   icon,
 }: {
@@ -110,6 +111,7 @@ export function Modal({
   onClose: () => void;
   title: string;
   children: ReactNode;
+  footer?: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   icon?: ReactNode;
 }) {
@@ -129,6 +131,11 @@ export function Modal({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-6">{children}</div>
+        {footer && (
+          <div className="flex-shrink-0 flex items-center justify-end gap-3 px-6 h-16 border-t border-ink-100 bg-white">
+            {footer}
+          </div>
+        )}
       </div>
     </div>);
 }
@@ -352,6 +359,23 @@ export function Avatar({ initials, size = 'md' }: { initials: string; size?: 'sm
     <div className={`${s} rounded-full bg-gradient-to-br from-emerald-400 to-sky-400 flex items-center justify-center font-bold text-white shrink-0`}>
       {initials}
     </div>
+  );
+}
+
+// ---- Circular Flag Icon (CSS-based, no emoji dependency) ----
+const flagStyles: Record<string, string> = {
+  uz: 'linear-gradient(to bottom, #0099b5 33%, #fff 33%, #fff 66%, #1eb53a 66%)',
+  ru: 'linear-gradient(to bottom, #fff 33%, #0039a6 33%, #0039a6 66%, #d52b1e 66%)',
+  en: 'linear-gradient(to bottom, #012169 40%, #fff 40%, #fff 60%, #c8102e 60%), linear-gradient(to right, #c8102e 40%, #fff 40%, #fff 60%, #012169 60%)',
+};
+export function FlagIcon({ code, size = 'md' }: { code: string; size?: 'sm' | 'md' }) {
+  const s = size === 'sm' ? 'h-6 w-6' : 'h-7 w-7';
+  return (
+    <span
+      className={`${s} rounded-full shrink-0 ring-1 ring-black/10 overflow-hidden inline-block`}
+      style={{ background: flagStyles[code] ?? flagStyles.en }}
+      aria-label={code}
+    />
   );
 }
 

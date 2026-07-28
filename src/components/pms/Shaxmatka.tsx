@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -60,6 +60,7 @@ export function Shaxmatka({
   const [dragEnd, setDragEnd] = useState<{ roomId: string; dayOffset: number } | null>(null);
   const [groupBooking, setGroupBooking] = useState(false);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const quickBookingRef = useRef<{ submit: () => void } | null>(null);
   const toast = useToast();
 
     const statusStyle: Record<BookingStatus, { bar: string; chip: string; labelKey: string; ring: string }> = {
@@ -266,7 +267,7 @@ export function Shaxmatka({
             onClick={() => setGroupBooking(true)}
             className="inline-flex items-center gap-1.5 px-3 h-9 text-xs font-semibold text-ink-700 bg-ink-100 rounded-lg hover:bg-ink-200 transition-colors whitespace-nowrap"
           >
-            <Users size={14} /> Guruhli bron
+            <Users size={14} /> {t('gb_title')}
           </button>
         </div>
       </div>
@@ -398,7 +399,7 @@ export function Shaxmatka({
                           const tariff = data.tariffs.find((tm) => tm.id === b.tariffId);
                           const tipId = `${room.id}-${b.id}`;
                           return (
-                            <div key={b.id} className="relative h-full" style={{ gridColumn: `${colStart} / ${colEnd}` }}>
+                            <div key={b.id} className="relative h-full overflow-hidden" style={{ gridColumn: `${colStart} / ${colEnd}` }}>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setEditingBooking(b); }}
                                 onMouseEnter={() => setHovered(tipId)}
@@ -459,16 +460,26 @@ export function Shaxmatka({
         title={t('qb_title')}
         size="lg"
         icon={<Plus size={18} className="text-indigo-600" />}
+        footer={
+          quickBooking ? (
+            <>
+              <button onClick={() => setQuickBooking(null)} className="btn-secondary">{t('qb_cancel')}</button>
+              <button onClick={() => quickBookingRef.current?.submit()} className="btn-success">
+                <Plus size={15} /> {t('qb_create')}
+              </button>
+            </>
+          ) : null
+        }
       >
         {quickBooking && (
           <QuickBookingForm
+            ref={quickBookingRef}
             roomId={quickBooking.roomId}
             dayOffset={quickBooking.dayOffset}
             rooms={data.rooms}
             tariffs={data.tariffs}
             services={data.services}
             categories={data.categories}
-            onClose={() => setQuickBooking(null)}
             onAdd={addBooking}
           />
         )}
@@ -526,6 +537,7 @@ export function Shaxmatka({
         rooms={data.rooms}
         categories={data.categories}
         tariffs={data.tariffs}
+        services={data.services}
         lang={lang}
         onSubmit={(updatedBooking) => {
           onUpdateData({
@@ -695,25 +707,23 @@ function BookingDetail({
   );
 }
 
-function QuickBookingForm({
-  roomId,
-  dayOffset,
-  rooms,
-  tariffs,
-  services,
-  categories,
-  onClose,
-  onAdd,
-}: {
+const QuickBookingForm = forwardRef<{ submit: () => void }, {
   roomId: string;
   dayOffset: number;
   rooms: Room[];
   tariffs: Tariff[];
   services: ExtraService[];
   categories: RoomCategory[];
-  onClose: () => void;
   onAdd: (b: Omit<Booking, 'id'>) => void;
-}) {
+}>(function QuickBookingForm({
+  roomId,
+  dayOffset,
+  rooms,
+  tariffs,
+  services,
+  categories,
+  onAdd,
+}, ref) {
   const { lang, t } = useLang();
   const [selectedRoomId, setSelectedRoomId] = useState(roomId);
   const [guest, setGuest] = useState('');
@@ -768,8 +778,9 @@ function QuickBookingForm({
       paymentStatus,
       serviceIds: selectedServices,
     });
-    onClose();
   };
+
+  useImperativeHandle(ref, () => ({ submit }), [guest, selectedRoomId, country, dayOffset, nights, status, total, channel, phone, tariffId, paymentStatus, selectedServices]);
 
   return (
     <div className="space-y-4">
@@ -824,13 +835,13 @@ function QuickBookingForm({
         <div>
           <label className="label">{t('qb_status')}</label>
           <select value={status} onChange={(e) => setStatus(e.target.value as BookingStatus)} className="input">
-            {(['Pending', 'Confirmed', 'Checked-in'] as BookingStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+            {(['Pending', 'Confirmed', 'Checked-in'] as BookingStatus[]).map((s) => <option key={s} value={s}>{t(`status_${s === 'Checked-in' ? 'checkedIn' : s === 'Checked-out' ? 'checkedOut' : s.toLowerCase()}`)}</option>)}
           </select>
         </div>
         <div>
           <label className="label">{t('qb_paymentStatus')}</label>
           <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as 'Paid' | 'Partial' | 'Unpaid')} className="input">
-            {['Unpaid', 'Partial', 'Paid'].map((s) => <option key={s} value={s}>{s}</option>)}
+            {['Unpaid', 'Partial', 'Paid'].map((s) => <option key={s} value={s}>{t(`pay_${s.toLowerCase()}`)}</option>)}
           </select>
         </div>
         <div className="sm:col-span-2">
@@ -869,13 +880,6 @@ function QuickBookingForm({
           <span className="text-lg font-extrabold text-ink-900 tabular">{UZS(total, lang)}</span>
         </div>
       </div>
-
-      <div className="flex justify-end gap-2 pt-2 border-t border-ink-100">
-        <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm">{t('qb_cancel')}</button>
-        <button onClick={submit} disabled={!guest.trim() || !selectedRoomId} className="btn-success px-4 py-2 text-sm">
-          <Plus size={15} /> {t('qb_create')}
-        </button>
-      </div>
       </>
       ) : (
         <div className="rounded-xl bg-ink-50 p-6 text-center text-sm text-ink-400">
@@ -884,7 +888,7 @@ function QuickBookingForm({
       )}
     </div>
   );
-}
+});
 
 function Info({ label, value }: { label: string; value: string }) {
   return (

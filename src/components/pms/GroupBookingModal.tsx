@@ -47,7 +47,7 @@ export function GroupBookingModal({
   const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Partial' | 'Unpaid'>('Unpaid');
   const [notes, setNotes] = useState('');
 
-  const selectedTariff = tariffs.find((t) => t.id === tariffId);
+  const selectedTariff = tariffs.find((tm) => tm.id === tariffId);
   const nightly = selectedTariff?.dailyRate || 0;
   const totalPerRoom = nightly * nights;
   const totalAll = totalPerRoom * selectedRoomIds.length;
@@ -98,7 +98,7 @@ export function GroupBookingModal({
       <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden">
         <div className="flex-shrink-0 flex items-center justify-between px-6 h-16 border-b border-ink-100">
           <h2 className="text-xl font-bold text-ink-900 flex items-center gap-2">
-            <Users size={24} /> Guruhli Bron Qo'shish
+            <Users size={24} /> {t('gb_addTitle')}
           </h2>
           <button
             onClick={onClose}
@@ -111,23 +111,23 @@ export function GroupBookingModal({
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
           {/* Group Information */}
           <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-2">Guruh Ismi *</label>
+            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_groupName')} *</label>
             <input
               type="text"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              placeholder="Masalan: Qajomijon Oilasi"
+              placeholder={t('gb_groupNamePh')}
               className="input w-full"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-2">Asosiy Mehmon Ismi *</label>
+            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_leadGuest')} *</label>
             <input
               type="text"
               value={leadGuestName}
               onChange={(e) => setLeadGuestName(e.target.value)}
-              placeholder="Guruh rahbari ismi"
+              placeholder={t('gb_leadGuestPh')}
               className="input w-full"
             />
           </div>
@@ -135,7 +135,7 @@ export function GroupBookingModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-ink-700 mb-2 flex items-center gap-1">
-                <Phone size={14} /> Telefon
+                <Phone size={14} /> {t('eb_phone')}
               </label>
               <input
                 type="tel"
@@ -161,7 +161,9 @@ export function GroupBookingModal({
 
           {/* Room Selection */}
           <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-3">Xonalarni Tanlang * ({selectedRoomIds.length} xona)</label>
+            <label className="block text-sm font-semibold text-ink-700 mb-3">
+              {t('gb_selectRooms')} * ({selectedRoomIds.length})
+            </label>
             <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border border-ink-200 rounded-lg p-3 bg-ink-50">
               {rooms.map((room) => {
                 const cat = categories.find((c) => c.id === room.categoryId);
@@ -189,7 +191,7 @@ export function GroupBookingModal({
           {/* Booking Details */}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">Kirish Kuni (offset)</label>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_checkInOffset')}</label>
               <input
                 type="number"
                 value={startOffset}
@@ -198,7 +200,7 @@ export function GroupBookingModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">Tun Soni *</label>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_nights')} *</label>
               <input
                 type="number"
                 min="1"
@@ -208,9 +210,9 @@ export function GroupBookingModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">Tarif *</label>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_tariff')} *</label>
               <select value={tariffId} onChange={(e) => setTariffId(e.target.value)} className="input w-full">
-                <option value="">Tarifni tanlang...</option>
+                <option value="">{t('gb_selectTariff')}</option>
                 {tariffs.map((tariff) => (
                   <option key={tariff.id} value={tariff.id}>
                     {tariff.name} - {UZS(tariff.dailyRate, lang)}/tun
@@ -224,35 +226,35 @@ export function GroupBookingModal({
           {selectedRoomIds.length > 0 && (
             <div className="grid grid-cols-3 gap-4 bg-indigo-50 p-4 rounded-lg">
               <div>
-                <p className="text-xs text-indigo-600 mb-1">Xona boshiga kunlik narxi</p>
+                <p className="text-xs text-indigo-600 mb-1">{t('gb_perRoomDaily')}</p>
                 <p className="text-lg font-bold text-indigo-900">{UZS(nightly, lang)}</p>
               </div>
               <div>
-                <p className="text-xs text-indigo-600 mb-1">Xona boshiga jami ({nights} tun)</p>
+                <p className="text-xs text-indigo-600 mb-1">{t('gb_perRoomTotal')} ({nights})</p>
                 <p className="text-lg font-bold text-indigo-900">{UZS(totalPerRoom, lang)}</p>
               </div>
               <div>
-                <p className="text-xs text-indigo-600 mb-1">Barcha xonalar uchun ({selectedRoomIds.length} x {nights})</p>
+                <p className="text-xs text-indigo-600 mb-1">{t('gb_allRooms')} ({selectedRoomIds.length} x {nights})</p>
                 <p className="text-lg font-bold text-indigo-900">{UZS(totalAll, lang)}</p>
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-2">To'lov Holati</label>
-            <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as any)} className="input w-full">
-              <option value="Paid">To'liq to'langan</option>
-              <option value="Partial">Qisman to'langan</option>
-              <option value="Unpaid">To'lanmagan</option>
+            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_paymentStatus')}</label>
+            <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as 'Paid' | 'Partial' | 'Unpaid')} className="input w-full">
+              <option value="Paid">{t('pay_paid')}</option>
+              <option value="Partial">{t('pay_partial')}</option>
+              <option value="Unpaid">{t('pay_unpaid')}</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-2">Qaydlar</label>
+            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_notes')}</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Eslatmalar..."
+              placeholder={t('gb_notesPh')}
               className="input w-full min-h-20 resize-none"
             />
           </div>
@@ -260,7 +262,7 @@ export function GroupBookingModal({
 
         <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 h-16 border-t border-ink-100 bg-white">
           <button onClick={onClose} className="btn-secondary">
-            Bekor qilish
+            {t('gb_cancel')}
           </button>
           <button
             onClick={handleSubmit}
@@ -268,8 +270,8 @@ export function GroupBookingModal({
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {selectedRoomIds.length > 0
-              ? `${selectedRoomIds.length} Xona uchun Bron Qo'shish`
-              : 'Xona Tanlang'}
+              ? `${selectedRoomIds.length} — ${t('gb_create')}`
+              : t('gb_selectRoom')}
           </button>
         </div>
       </div>
