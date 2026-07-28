@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import type { Booking, Room, RoomCategory, Tariff, ExtraService, BookingStatus } from '../../types';
-import { UZS } from '../../utils';
+import { useState, useEffect, useMemo } from 'react';
+import { X, Users, Calendar, Baby } from 'lucide-react';
+import type { Booking, Room, RoomCategory, Tariff, ExtraService, BookingStatus, BookingGuest } from '../../types';
+import { UZS, todayISO, addDaysISO, nightsBetween } from '../../utils';
 import { useLang } from '../../i18n';
 import type { CurrencyLang } from '../../utils';
 
@@ -32,26 +32,55 @@ export function EditBookingModal({
   const [guestName, setGuestName] = useState('');
   const [phone, setPhone] = useState('');
   const [roomId, setRoomId] = useState('');
-  const [nights, setNights] = useState(1);
-  const [startOffset, setStartOffset] = useState(0);
+  const [checkIn, setCheckIn] = useState(todayISO());
+  const [checkOut, setCheckOut] = useState(addDaysISO(todayISO(), 1));
   const [tariffId, setTariffId] = useState('');
   const [status, setStatus] = useState<BookingStatus>('Confirmed');
   const [paymentStatus, setPaymentStatus] = useState<'Paid' | 'Partial' | 'Unpaid'>('Unpaid');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
+  const [guestNames, setGuestNames] = useState<BookingGuest[]>([]);
 
   useEffect(() => {
     if (initialBooking) {
       setGuestName(initialBooking.guestName);
       setPhone(initialBooking.phone);
       setRoomId(initialBooking.roomId);
-      setNights(initialBooking.nights);
-      setStartOffset(initialBooking.startOffset);
+      const ci = addDaysISO(todayISO(), initialBooking.startOffset);
+      const co = addDaysISO(ci, initialBooking.nights);
+      setCheckIn(ci);
+      setCheckOut(co);
       setTariffId(initialBooking.tariffId || '');
       setStatus(initialBooking.status);
       setPaymentStatus(initialBooking.paymentStatus);
       setSelectedServices(initialBooking.serviceIds || []);
+      setAdults(initialBooking.adults ?? 1);
+      setChildren(initialBooking.children ?? 0);
+      setGuestNames(initialBooking.guests ?? []);
     }
   }, [initialBooking, open]);
+
+  const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
+
+  // Sync guest name fields when adult/child counts change
+  useEffect(() => {
+    setGuestNames((prev) => {
+      const target = adults + children;
+      if (prev.length === target) return prev;
+      const next = [...prev];
+      while (next.length < target) {
+        const idx = next.length;
+        next.push({
+          name: idx === 0 ? guestName : '',
+          type: idx < adults ? 'adult' : 'child',
+        });
+      }
+      while (next.length > target) next.pop();
+      // Reassign types
+      return next.map((g, i) => ({ ...g, type: i < adults ? 'adult' as const : 'child' as const }));
+    });
+  }, [adults, children]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedTariff = tariffs.find((tm) => tm.id === tariffId);
   const room = rooms.find((r) => r.id === roomId);
@@ -70,8 +99,21 @@ export function EditBookingModal({
     setSelectedServices((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]);
   };
 
+  const selectedCategory = categories.find((c) => c.id === room?.categoryId);
+  const maxAdults = selectedCategory?.maxAdults ?? 10;
+  const maxChildren = selectedCategory?.maxChildren ?? 10;
+
+  const handleGuestNameChange = (idx: number, name: string) => {
+    setGuestNames((prev) => prev.map((g, i) => (i === idx ? { ...g, name } : g)));
+    if (idx === 0) setGuestName(name);
+  };
+
   const handleSubmit = () => {
     if (!initialBooking || !guestName || !roomId || nights <= 0) return;
+
+    const startOffset = Math.round(
+      (new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000,
+    );
 
     const updated: Booking = {
       ...initialBooking,
@@ -85,6 +127,9 @@ export function EditBookingModal({
       paymentStatus,
       total,
       serviceIds: selectedServices,
+      adults,
+      children,
+      guests: guestNames,
     };
 
     onSubmit(updated);
@@ -103,13 +148,16 @@ export function EditBookingModal({
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
           <div>
             <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_guest')} *</label>
             <input
               type="text"
               value={guestName}
-              onChange={(e) => setGuestName(e.target.value)}
+              onChange={(e) => {
+                setGuestName(e.target.value);
+                handleGuestNameChange(0, e.target.value);
+              }}
               placeholder={t('eb_guestPh')}
               className="input w-full"
             />
@@ -156,31 +204,130 @@ export function EditBookingModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          {/* Check-in / Check-out Date Pickers */}
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_checkInOffset')}</label>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar size={14} className="text-indigo-500" />
+                  {t('eb_checkInDate')}
+                </span>
+              </label>
               <input
-                type="number"
-                value={startOffset}
-                onChange={(e) => setStartOffset(parseInt(e.target.value) || 0)}
+                type="date"
+                value={checkIn}
+                onChange={(e) => {
+                  const newCi = e.target.value;
+                  if (newCi >= checkOut) {
+                    setCheckOut(addDaysISO(newCi, 1));
+                  }
+                  setCheckIn(newCi);
+                }}
                 className="input w-full"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_nights')} *</label>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar size={14} className="text-indigo-500" />
+                  {t('eb_checkOutDate')}
+                </span>
+              </label>
               <input
-                type="number"
-                min="1"
-                value={nights}
-                onChange={(e) => setNights(Math.max(1, parseInt(e.target.value) || 1))}
+                type="date"
+                value={checkOut}
+                min={addDaysISO(checkIn, 1)}
+                onChange={(e) => {
+                  if (e.target.value > checkIn) setCheckOut(e.target.value);
+                }}
                 className="input w-full"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_ratePerDay')}</label>
-              <p className="text-sm font-bold text-ink-800 mt-2">{UZS(nightly, lang)}</p>
             </div>
           </div>
+
+          {/* Nights summary + Rate */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-xl bg-indigo-50 px-4 py-3 flex flex-col justify-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-400">{t('eb_nights')}</p>
+              <p className="text-lg font-extrabold text-indigo-700 tabular leading-tight mt-0.5">
+                {nights} <span className="text-xs font-medium text-indigo-400">{t('eb_nightsCalc')}</span>
+              </p>
+            </div>
+            <div className="rounded-xl bg-ink-50 px-4 py-3 flex flex-col justify-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">{t('eb_ratePerDay')}</p>
+              <p className="text-lg font-bold text-ink-800 tabular leading-tight mt-0.5">{UZS(nightly, lang)}</p>
+            </div>
+            <div className="rounded-xl bg-ink-50 px-4 py-3 flex flex-col justify-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">{t('eb_totalPrice')}</p>
+              <p className="text-lg font-extrabold text-indigo-600 tabular leading-tight mt-0.5">{UZS(total, lang)}</p>
+            </div>
+          </div>
+
+          {/* Guest counts */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users size={14} className="text-ink-400" />
+                  {t('eb_adults')}
+                </span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={maxAdults}
+                value={adults}
+                onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))}
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Baby size={14} className="text-ink-400" />
+                  {t('eb_children')}
+                </span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={maxChildren}
+                value={children}
+                onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))}
+                className="input w-full"
+              />
+            </div>
+          </div>
+
+          {/* Dynamic guest name fields */}
+          {(adults + children) > 1 && (
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_guestNames')}</label>
+              <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
+                {guestNames.map((g, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span
+                      className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${
+                        g.type === 'adult'
+                          ? 'bg-indigo-100 text-indigo-600'
+                          : 'bg-amber-100 text-amber-600'
+                      }`}
+                    >
+                      {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
+                      {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
+                    </span>
+                    <input
+                      type="text"
+                      value={g.name}
+                      onChange={(e) => handleGuestNameChange(idx, e.target.value)}
+                      placeholder={t('eb_guestNamePh')}
+                      className="input flex-1 !py-1.5 !text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Extra Services */}
           {services.filter((s) => s.active).length > 0 && (
@@ -213,7 +360,7 @@ export function EditBookingModal({
           <div className="rounded-xl bg-ink-50 p-4 space-y-1.5">
             {selectedTariff && (
               <div className="flex justify-between text-xs">
-                <span className="text-ink-400">{selectedTariff.name} ({nights} {t('eb_nights').toLowerCase()})</span>
+                <span className="text-ink-400">{selectedTariff.name} ({nights} {t('eb_nightsCalc')})</span>
                 <span className="tabular text-ink-600">{UZS(baseTotal, lang)}</span>
               </div>
             )}
@@ -255,14 +402,15 @@ export function EditBookingModal({
           </div>
         </div>
 
-        <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 h-16 border-t border-ink-100 bg-white">
-          <button onClick={onClose} className="btn-secondary">
+        {/* Fixed footer with proper padding, spacing, and border */}
+        <div className="flex-shrink-0 flex items-center gap-3 justify-end px-6 py-4 border-t border-ink-100 bg-white">
+          <button onClick={onClose} className="btn-secondary px-5 py-2.5 text-sm">
             {t('eb_cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!guestName || !roomId || nights <= 0}
-            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('eb_save')}
           </button>

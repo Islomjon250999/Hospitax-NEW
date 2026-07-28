@@ -33,6 +33,8 @@ export interface RoomCategory {
   name: string;
   baseAdults: number;
   baseKids: number;
+  maxAdults: number;
+  maxChildren: number;
   totalQuantity: number;
   roomIds: string[]; // assigned room ids
   description?: string;
@@ -74,6 +76,11 @@ export interface ExtraService {
   active: boolean;
 }
 
+export interface BookingGuest {
+  name: string;
+  type: 'adult' | 'child';
+}
+
 export interface Booking {
   id: string;
   roomId: string;
@@ -88,6 +95,9 @@ export interface Booking {
   tariffId?: string;
   paymentStatus: 'Paid' | 'Partial' | 'Unpaid';
   serviceIds?: string[];
+  adults?: number;
+  children?: number;
+  guests?: BookingGuest[];
 }
 
 export interface Channel {

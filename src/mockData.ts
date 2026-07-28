@@ -30,10 +30,10 @@ export const properties: Property[] = [
 
 // ---- PMS: room categories ----
 export const roomCategories: RoomCategory[] = [
-  { id: 'cat1', name: 'Standard King', baseAdults: 2, baseKids: 1, totalQuantity: 2, roomIds: ['r1', 'r2'], description: 'Cozy room with a king-size bed and city view.' },
-  { id: 'cat2', name: 'Deluxe Twin', baseAdults: 2, baseKids: 2, totalQuantity: 2, roomIds: ['r3', 'r4'], description: 'Spacious twin room with premium bedding.' },
-  { id: 'cat3', name: 'Executive Suite', baseAdults: 3, baseKids: 2, totalQuantity: 2, roomIds: ['r5', 'r6'], description: 'Elegant suite with separate living room.' },
-  { id: 'cat4', name: 'VIP Villa', baseAdults: 6, baseKids: 4, totalQuantity: 2, roomIds: ['r7', 'r8'], description: 'Luxurious standalone villa with private pool.' },
+  { id: 'cat1', name: 'Standard King', baseAdults: 2, baseKids: 1, maxAdults: 3, maxChildren: 2, totalQuantity: 2, roomIds: ['r1', 'r2'], description: 'Cozy room with a king-size bed and city view.' },
+  { id: 'cat2', name: 'Deluxe Twin', baseAdults: 2, baseKids: 2, maxAdults: 4, maxChildren: 2, totalQuantity: 2, roomIds: ['r3', 'r4'], description: 'Spacious twin room with premium bedding.' },
+  { id: 'cat3', name: 'Executive Suite', baseAdults: 3, baseKids: 2, maxAdults: 4, maxChildren: 3, totalQuantity: 2, roomIds: ['r5', 'r6'], description: 'Elegant suite with separate living room.' },
+  { id: 'cat4', name: 'VIP Villa', baseAdults: 6, baseKids: 4, maxAdults: 8, maxChildren: 6, totalQuantity: 2, roomIds: ['r7', 'r8'], description: 'Luxurious standalone villa with private pool.' },
 ];
 
 // ---- PMS: rooms (linked to categories) ----

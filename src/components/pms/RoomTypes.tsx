@@ -132,7 +132,7 @@ export function RoomTypes({ rooms, categories, onUpdate }: Props) {
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                <div className="mt-4 grid grid-cols-4 gap-3 text-center">
                   <div className="rounded-lg bg-ink-50 py-2.5">
                     <p className="text-base font-bold text-ink-800 tabular">{cat.baseAdults}</p>
                     <p className="text-[10px] text-ink-400 font-medium">{t('rt_adults')}</p>
@@ -141,9 +141,13 @@ export function RoomTypes({ rooms, categories, onUpdate }: Props) {
                     <p className="text-base font-bold text-ink-800 tabular">{cat.baseKids}</p>
                     <p className="text-[10px] text-ink-400 font-medium">{t('rt_kids')}</p>
                   </div>
-                  <div className="rounded-lg bg-ink-50 py-2.5">
-                    <p className="text-base font-bold text-ink-800 tabular">{catRooms.length}</p>
-                    <p className="text-[10px] text-ink-400 font-medium">{t('rt_rooms')}</p>
+                  <div className="rounded-lg bg-indigo-50 py-2.5">
+                    <p className="text-base font-bold text-indigo-600 tabular">{cat.maxAdults}</p>
+                    <p className="text-[10px] text-indigo-400 font-medium">{t('rcm_maxAdults')}</p>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 py-2.5">
+                    <p className="text-base font-bold text-amber-600 tabular">{cat.maxChildren}</p>
+                    <p className="text-[10px] text-amber-500 font-medium">{t('rcm_maxChildren')}</p>
                   </div>
                 </div>
 
@@ -212,6 +216,8 @@ function CategoryModal({
   const [description, setDescription] = useState(category?.description ?? '');
   const [baseAdults, setBaseAdults] = useState(category?.baseAdults ?? 2);
   const [baseKids, setBaseKids] = useState(category?.baseKids ?? 1);
+  const [maxAdults, setMaxAdults] = useState(category?.maxAdults ?? 4);
+  const [maxChildren, setMaxChildren] = useState(category?.maxChildren ?? 2);
   const [roomLabels, setRoomLabels] = useState(
     category ? rooms.filter((r) => r.categoryId === category.id).map((r) => r.label).join(', ') : '',
   );
@@ -229,6 +235,8 @@ function CategoryModal({
         description: description.trim(),
         baseAdults,
         baseKids,
+        maxAdults,
+        maxChildren,
         totalQuantity: labels.length,
         roomIds: category?.roomIds ?? [],
       },
@@ -255,6 +263,16 @@ function CategoryModal({
           <div>
             <label className="label">{t('rcm_baseKids')}</label>
             <input type="number" min={0} value={baseKids} onChange={(e) => setBaseKids(Number(e.target.value))} className="input" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">{t('rcm_maxAdults')}</label>
+            <input type="number" min={baseAdults} value={maxAdults} onChange={(e) => setMaxAdults(Number(e.target.value))} className="input" />
+          </div>
+          <div>
+            <label className="label">{t('rcm_maxChildren')}</label>
+            <input type="number" min={baseKids} value={maxChildren} onChange={(e) => setMaxChildren(Number(e.target.value))} className="input" />
           </div>
         </div>
         <div>
