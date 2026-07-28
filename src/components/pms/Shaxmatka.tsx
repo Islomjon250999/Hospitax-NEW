@@ -82,7 +82,12 @@ export function Shaxmatka({
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [hoveredTip, setHoveredTip] = useState<{
+    booking: Booking;
+    rect: DOMRect;
+    showAbove: boolean;
+    tariff?: Tariff;
+  } | null>(null);
   const [showInhouse, setShowInhouse] = useState(false);
   const [showArrivals, setShowArrivals] = useState(false);
   const [showDepartures, setShowDepartures] = useState(false);
@@ -378,8 +383,8 @@ export function Shaxmatka({
                           </button>
                           {statusMenuRoomId === room.id && (
                             <>
-                              <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setStatusMenuRoomId(null); }} />
-                              <div className="absolute right-0 top-full mt-1 z-50 w-36 card p-1.5 shadow-float animate-scale-in">
+                              <div className="fixed inset-0 z-[55]" onClick={(e) => { e.stopPropagation(); setStatusMenuRoomId(null); }} />
+                              <div className="absolute right-0 top-full mt-1 z-[60] w-36 card p-1.5 shadow-float animate-scale-in">
                                 {(['Clean', 'Dirty', 'Inspected', 'Maintenance'] as RoomStatus[]).map((s) => (
                                   <button
                                     key={s}
@@ -458,37 +463,22 @@ export function Shaxmatka({
                           const span = displayEnd - displayStart;
                           const st = statusStyle[b.status];
                           const tariff = data.tariffs.find((tm) => tm.id === b.tariffId);
-                          const tipId = `${room.id}-${b.id}`;
                           const lane = lanes.get(b.id) ?? 0;
                           return (
                             <div key={b.id} className="relative h-full" style={{ gridColumn: `${colStart} / span ${span}` }}>
                               <div className="absolute inset-x-1 z-10" style={{ top: `${laneOffset + lane * (BAR_H + BAR_GAP)}px`, height: `${BAR_H}px` }}>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); setEditingBooking(b); }}
-                                  onMouseEnter={() => setHovered(tipId)}
-                                  onMouseLeave={() => setHovered(null)}
+                                  onClick={(e) => { e.stopPropagation(); setHoveredTip(null); setEditingBooking(b); }}
+                                  onMouseEnter={(e) => {
+                                    if (statusMenuRoomId) return;
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setHoveredTip({ booking: b, rect, showAbove: lane >= count / 2, tariff });
+                                  }}
+                                  onMouseLeave={() => setHoveredTip(null)}
                                   className={`w-full h-full flex items-center px-3 py-1.5 ${st.bar} text-xs text-white font-medium rounded-lg shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
                                 >
                                   <span className="truncate">{b.guestName} — {t(st.labelKey)}</span>
                                 </button>
-                                {hovered === tipId && (
-                                  <div className="absolute z-50 left-0 w-64 card p-3.5 shadow-float animate-scale-in text-left pointer-events-none" style={lane < count / 2 ? { top: '100%', marginTop: '6px' } : { bottom: '100%', marginBottom: '6px' }}>
-                                    <div className="flex items-center justify-between mb-2">
-                                      <p className="text-sm font-bold text-ink-900">{b.guestName}</p>
-                                      <span className={`chip ${st.chip}`}>{t(st.labelKey)}</span>
-                                    </div>
-                                    <div className="space-y-1 text-xs text-ink-600">
-                                      <TipRow label={t('bd_checkIn')} value={`Day ${b.startOffset >= 0 ? '+' : ''}${b.startOffset}`} />
-                                      <TipRow label={t('bd_nights')} value={String(b.nights)} />
-                                      {tariff && <TipRow label={t('bd_tariffPlan')} value={tariff.name} />}
-                                      <TipRow label={t('bd_total')} value={UZS(b.total, lang)} />
-                                      <div className="flex items-center justify-between pt-1">
-                                        <span className="text-ink-400">{t('qb_paymentStatus')}</span>
-                                        <span className={`chip ${paymentStyle[b.paymentStatus].chip}`}>{t(paymentStyle[b.paymentStatus].labelKey)}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           );
@@ -612,6 +602,39 @@ export function Shaxmatka({
           toast(t('gen_save'), 'success');
         }}
       />
+
+      {hoveredTip && (() => {
+        const b = hoveredTip.booking;
+        const st = statusStyle[b.status];
+        const tariff = hoveredTip.tariff;
+        const tooltipW = 256;
+        const left = Math.max(8, Math.min(hoveredTip.rect.left, window.innerWidth - tooltipW - 8));
+        return (
+          <div
+            className="fixed z-[65] w-64 card p-3.5 shadow-float animate-scale-in text-left pointer-events-none"
+            style={{
+              left: `${left}px`,
+              top: hoveredTip.showAbove ? `${hoveredTip.rect.top - 6}px` : `${hoveredTip.rect.bottom + 6}px`,
+              transform: hoveredTip.showAbove ? 'translateY(-100%)' : 'none',
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-bold text-ink-900 truncate">{b.guestName}</p>
+              <span className={`chip ${st.chip} shrink-0`}>{t(st.labelKey)}</span>
+            </div>
+            <div className="space-y-1 text-xs text-ink-600">
+              <TipRow label={t('bd_checkIn')} value={`Day ${b.startOffset >= 0 ? '+' : ''}${b.startOffset}`} />
+              <TipRow label={t('bd_nights')} value={String(b.nights)} />
+              {tariff && <TipRow label={t('bd_tariffPlan')} value={tariff.name} />}
+              <TipRow label={t('bd_total')} value={UZS(b.total, lang)} />
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-ink-400">{t('qb_paymentStatus')}</span>
+                <span className={`chip ${paymentStyle[b.paymentStatus].chip}`}>{t(paymentStyle[b.paymentStatus].labelKey)}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
