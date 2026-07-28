@@ -27,31 +27,34 @@ import { EditBookingModal } from './EditBookingModal';
 
 const DAYS = 14;
 
-const BAR_H = 32;
-const BAR_GAP = 4;
-const BAR_PAD = 6;
+const BAR_H = 34;
+const BAR_GAP = 6;
+const BAR_PAD = 8;
+const ROW_MIN_H = 56;
 
-function assignLanes(bookings: Booking[]): Map<string, number> {
-  const sorted = [...bookings].sort((a, b) => a.startOffset - b.startOffset);
+interface LaneResult {
+  lanes: Map<string, number>;
+  count: number;
+}
+
+function assignLanes(bookings: Booking[]): LaneResult {
+  const sorted = [...bookings].sort(
+    (a, b) => a.startOffset - b.startOffset || (a.startOffset + a.nights) - (b.startOffset + b.nights),
+  );
   const laneEnds: number[] = [];
-  const result = new Map<string, number>();
+  const lanes = new Map<string, number>();
   for (const b of sorted) {
     const end = b.startOffset + b.nights;
-    let lane = -1;
-    for (let i = 0; i < laneEnds.length; i++) {
-      if (laneEnds[i] <= b.startOffset) {
-        laneEnds[i] = end;
-        lane = i;
-        break;
-      }
-    }
+    let lane = laneEnds.findIndex((e) => e <= b.startOffset);
     if (lane === -1) {
       laneEnds.push(end);
       lane = laneEnds.length - 1;
+    } else {
+      laneEnds[lane] = end;
     }
-    result.set(b.id, lane);
+    lanes.set(b.id, lane);
   }
-  return result;
+  return { lanes, count: laneEnds.length };
 }
 
 let bookingCounter = 200;
@@ -343,10 +346,10 @@ export function Shaxmatka({
 
                 {catRooms.map((room) => {
                   const roomBookings = visibleBookings.filter((b) => b.roomId === room.id);
-                  const laneMap = assignLanes(roomBookings);
-                  const roomBookingsLanes = roomBookings.length > 0 ? Math.max(...roomBookings.map((b) => (laneMap.get(b.id) ?? 0) + 1)) : 1;
+                  const { lanes, count } = assignLanes(roomBookings);
+                  const rowH = Math.max(ROW_MIN_H, count * (BAR_H + BAR_GAP) + BAR_PAD * 2);
                   return (
-                    <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)`, height: `${Math.max(56, roomBookingsLanes * (BAR_H + BAR_GAP) + BAR_PAD * 2)}px` }}>
+                    <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)`, height: `${rowH}px` }}>
                       <div className="sticky left-0 z-10 bg-inherit px-4 py-2.5 border-r border-ink-100 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <BedDouble size={14} className="text-ink-400 shrink-0" />
@@ -373,7 +376,7 @@ export function Shaxmatka({
                           </button>
                         </div>
                       </div>
-                      <div className="relative w-full overflow-hidden" style={{ gridColumn: '2 / -1', display: 'grid', gridTemplateColumns: `repeat(${DAYS}, 1fr)` }}>
+                      <div className="relative w-full" style={{ gridColumn: '2 / -1', display: 'grid', gridTemplateColumns: `repeat(${DAYS}, 1fr)` }}>
                         {days.map((_, i) => {
                           const dayOffset = startOffset + i;
                           const isInSelection = dragStart && dragEnd && 
@@ -405,7 +408,7 @@ export function Shaxmatka({
                                 setDragStart(null);
                                 setDragEnd(null);
                               }}
-                              className={`border-r border-ink-50 cursor-pointer transition-colors h-full ${
+                              className={`relative overflow-hidden z-0 border-r border-ink-50 cursor-pointer transition-colors h-full ${
                                 i === todayIndex ? 'bg-indigo-50/20' : ''
                               } ${
                                 isInSelection ? 'bg-indigo-100/60' : 'hover:bg-indigo-50/40'
@@ -423,39 +426,41 @@ export function Shaxmatka({
                           const displayStart = Math.max(bookStart, visStart);
                           const displayEnd = Math.min(bookEnd, visEnd);
                           const colStart = displayStart - visStart + 1;
-                          const colEnd = displayEnd - visStart + 1;
+                          const span = displayEnd - displayStart;
                           const st = statusStyle[b.status];
                           const tariff = data.tariffs.find((tm) => tm.id === b.tariffId);
                           const tipId = `${room.id}-${b.id}`;
+                          const lane = lanes.get(b.id) ?? 0;
                           return (
-                            <div key={b.id} className="relative h-full overflow-hidden" style={{ gridColumn: `${colStart} / ${colEnd}` }}>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setEditingBooking(b); }}
-                                onMouseEnter={() => setHovered(tipId)}
-                                onMouseLeave={() => setHovered(null)}
-                                className={`absolute inset-x-1 z-10 flex items-center px-3 py-1.5 ${st.bar} text-xs text-white font-medium rounded-lg shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
-                                style={{ top: `${BAR_PAD + (laneMap.get(b.id) ?? 0) * (BAR_H + BAR_GAP)}px`, height: `${BAR_H}px` }}
-                              >
-                                <span className="truncate">{b.guestName} — {t(st.labelKey)}</span>
-                              </button>
-                              {hovered === tipId && (
-                                <div className="absolute z-50 mt-1 left-0 w-60 card p-3 shadow-float animate-scale-in text-left pointer-events-none" style={{ top: '100%' }}>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <p className="text-sm font-bold text-ink-900">{b.guestName}</p>
-                                    <span className={`chip ${st.chip}`}>{t(st.labelKey)}</span>
-                                  </div>
-                                  <div className="space-y-1 text-xs text-ink-600">
-                                    <TipRow label={t('bd_checkIn')} value={`Day ${b.startOffset >= 0 ? '+' : ''}${b.startOffset}`} />
-                                    <TipRow label={t('bd_nights')} value={String(b.nights)} />
-                                    {tariff && <TipRow label={t('bd_tariffPlan')} value={tariff.name} />}
-                                    <TipRow label={t('bd_total')} value={UZS(b.total, lang)} />
-                                    <div className="flex items-center justify-between pt-1">
-                                      <span className="text-ink-400">{t('qb_paymentStatus')}</span>
-                                      <span className={`chip ${paymentStyle[b.paymentStatus].chip}`}>{t(paymentStyle[b.paymentStatus].labelKey)}</span>
+                            <div key={b.id} className="relative h-full" style={{ gridColumn: `${colStart} / span ${span}` }}>
+                              <div className="absolute inset-x-1 z-10" style={{ top: `${BAR_PAD + lane * (BAR_H + BAR_GAP)}px`, height: `${BAR_H}px` }}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setEditingBooking(b); }}
+                                  onMouseEnter={() => setHovered(tipId)}
+                                  onMouseLeave={() => setHovered(null)}
+                                  className={`w-full h-full flex items-center px-3 py-1.5 ${st.bar} text-xs text-white font-medium rounded-lg shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
+                                >
+                                  <span className="truncate">{b.guestName} — {t(st.labelKey)}</span>
+                                </button>
+                                {hovered === tipId && (
+                                  <div className="absolute z-50 mt-1 left-0 w-60 card p-3 shadow-float animate-scale-in text-left pointer-events-none" style={{ top: '100%' }}>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <p className="text-sm font-bold text-ink-900">{b.guestName}</p>
+                                      <span className={`chip ${st.chip}`}>{t(st.labelKey)}</span>
+                                    </div>
+                                    <div className="space-y-1 text-xs text-ink-600">
+                                      <TipRow label={t('bd_checkIn')} value={`Day ${b.startOffset >= 0 ? '+' : ''}${b.startOffset}`} />
+                                      <TipRow label={t('bd_nights')} value={String(b.nights)} />
+                                      {tariff && <TipRow label={t('bd_tariffPlan')} value={tariff.name} />}
+                                      <TipRow label={t('bd_total')} value={UZS(b.total, lang)} />
+                                      <div className="flex items-center justify-between pt-1">
+                                        <span className="text-ink-400">{t('qb_paymentStatus')}</span>
+                                        <span className={`chip ${paymentStyle[b.paymentStatus].chip}`}>{t(paymentStyle[b.paymentStatus].labelKey)}</span>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                           );
                         })}
