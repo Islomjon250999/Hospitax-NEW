@@ -348,9 +348,11 @@ export function Shaxmatka({
                   const roomBookings = visibleBookings.filter((b) => b.roomId === room.id);
                   const { lanes, count } = assignLanes(roomBookings);
                   const rowH = Math.max(ROW_MIN_H, count * (BAR_H + BAR_GAP) + BAR_PAD * 2);
+                  const laneBlockH = count > 0 ? count * BAR_H + (count - 1) * BAR_GAP : 0;
+                  const laneOffset = (rowH - laneBlockH) / 2;
                   return (
                     <div key={room.id} className="relative grid border-b border-ink-50 hover:bg-ink-50/30 transition-colors" style={{ gridTemplateColumns: `200px repeat(${DAYS}, 1fr)`, height: `${rowH}px` }}>
-                      <div className="sticky left-0 z-10 bg-inherit px-4 py-2.5 border-r border-ink-100 flex items-center justify-between gap-2">
+                      <div className="sticky left-0 z-10 bg-inherit px-4 border-r border-ink-100 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <BedDouble size={14} className="text-ink-400 shrink-0" />
                           <span className="text-sm font-semibold text-ink-800 truncate">{room.label}</span>
@@ -433,7 +435,7 @@ export function Shaxmatka({
                           const lane = lanes.get(b.id) ?? 0;
                           return (
                             <div key={b.id} className="relative h-full" style={{ gridColumn: `${colStart} / span ${span}` }}>
-                              <div className="absolute inset-x-1 z-10" style={{ top: `${BAR_PAD + lane * (BAR_H + BAR_GAP)}px`, height: `${BAR_H}px` }}>
+                              <div className="absolute inset-x-1 z-10" style={{ top: `${laneOffset + lane * (BAR_H + BAR_GAP)}px`, height: `${BAR_H}px` }}>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setEditingBooking(b); }}
                                   onMouseEnter={() => setHovered(tipId)}
