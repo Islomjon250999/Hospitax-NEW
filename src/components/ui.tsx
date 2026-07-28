@@ -362,20 +362,46 @@ export function Avatar({ initials, size = 'md' }: { initials: string; size?: 'sm
   );
 }
 
-// ---- Circular Flag Icon (CSS-based, no emoji dependency) ----
-const flagStyles: Record<string, string> = {
-  uz: 'linear-gradient(to bottom, #0099b5 33%, #fff 33%, #fff 66%, #1eb53a 66%)',
-  ru: 'linear-gradient(to bottom, #fff 33%, #0039a6 33%, #0039a6 66%, #d52b1e 66%)',
-  en: 'linear-gradient(to bottom, #012169 40%, #fff 40%, #fff 60%, #c8102e 60%), linear-gradient(to right, #c8102e 40%, #fff 40%, #fff 60%, #012169 60%)',
+// ---- Circular SVG Flag Icons ----
+const flagSvgs: Record<string, ReactNode> = {
+  uz: (
+    <svg viewBox="0 0 24 24" className="h-full w-full" preserveAspectRatio="xMidYMid slice">
+      <rect width="24" height="8" fill="#0099B5" />
+      <rect y="8" width="24" height="8" fill="#fff" />
+      <rect y="16" width="24" height="8" fill="#1EB53A" />
+      <circle cx="5" cy="4" r="1" fill="#fff" />
+      <circle cx="8" cy="6" r="0.8" fill="#fff" />
+      <circle cx="3" cy="7" r="0.6" fill="#fff" />
+    </svg>
+  ),
+  ru: (
+    <svg viewBox="0 0 24 24" className="h-full w-full" preserveAspectRatio="xMidYMid slice">
+      <rect width="24" height="8" fill="#fff" />
+      <rect y="8" width="24" height="8" fill="#0039A6" />
+      <rect y="16" width="24" height="8" fill="#D52B1E" />
+    </svg>
+  ),
+  en: (
+    <svg viewBox="0 0 24 24" className="h-full w-full" preserveAspectRatio="xMidYMid slice">
+      <rect width="24" height="24" fill="#012169" />
+      <path d="M0 0L24 24M24 0L0 24" stroke="#fff" strokeWidth="3" />
+      <path d="M0 0L24 24M24 0L0 24" stroke="#C8102E" strokeWidth="1.5" />
+      <rect x="10" width="4" height="24" fill="#fff" />
+      <rect y="10" width="24" height="4" fill="#fff" />
+      <rect x="11" width="2" height="24" fill="#C8102E" />
+      <rect y="11" width="24" height="2" fill="#C8102E" />
+    </svg>
+  ),
 };
 export function FlagIcon({ code, size = 'md' }: { code: string; size?: 'sm' | 'md' }) {
-  const s = size === 'sm' ? 'h-6 w-6' : 'h-7 w-7';
+  const s = size === 'sm' ? 'h-5 w-5' : 'h-7 w-7';
   return (
     <span
-      className={`${s} rounded-full shrink-0 ring-1 ring-black/10 overflow-hidden inline-block`}
-      style={{ background: flagStyles[code] ?? flagStyles.en }}
+      className={`${s} rounded-full shrink-0 ring-1 ring-black/10 overflow-hidden inline-flex items-center justify-center`}
       aria-label={code}
-    />
+    >
+      {flagSvgs[code] ?? flagSvgs.en}
+    </span>
   );
 }
 

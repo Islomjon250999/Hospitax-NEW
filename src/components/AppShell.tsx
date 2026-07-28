@@ -130,7 +130,7 @@ export function AppShell({
               trigger={
                 <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-ink-100 transition-colors text-sm font-semibold text-ink-700">
                   <FlagIcon code={lang} size="sm" />
-                  <span className="text-xs font-bold tracking-wide">{LANGUAGES.find((l) => l.code === lang)?.label}</span>
+                  <span className="text-xs font-bold tracking-wide">{LANGUAGES.find((l) => l.code === lang)?.shortCode}</span>
                   <ChevronDown size={13} className="text-ink-400" />
                 </button>
               }
@@ -149,6 +149,7 @@ export function AppShell({
                     >
                       <FlagIcon code={l.code} size="sm" />
                       <span className="flex-1">{l.label}</span>
+                      <span className="text-[10px] font-bold text-ink-400 uppercase">{l.shortCode}</span>
                       {lang === l.code && <Check size={14} className="text-indigo-600" />}
                     </button>
                   ))}

@@ -311,7 +311,7 @@ export function Shaxmatka({
                     <span className="text-xs font-bold text-ink-700">{category.name}</span>
                     <span className="text-[10px] text-ink-400">({catRooms.length})</span>
                   </div>
-                  <div className="col-span-14" style={{ gridColumn: '2 / -1' }} />
+                  <div style={{ gridColumn: '2 / -1' }} />
                 </div>
 
                 {catRooms.map((room) => {

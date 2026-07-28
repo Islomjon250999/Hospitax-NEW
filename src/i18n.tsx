@@ -5,13 +5,14 @@ export type Lang = 'uz' | 'ru' | 'en';
 interface LangMeta {
   code: Lang;
   label: string;
+  shortCode: string;
   flag: string;
 }
 
 export const LANGUAGES: LangMeta[] = [
-  { code: 'uz', label: "O'zbekcha", flag: '🇺🇿' },
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
+  { code: 'uz', label: "O'zbekcha", shortCode: 'UZ', flag: '🇺🇿' },
+  { code: 'en', label: 'English', shortCode: 'ENG', flag: '🇬🇧' },
+  { code: 'ru', label: 'Русский', shortCode: 'RU', flag: '🇷🇺' },
 ];
 
 type Dict = Record<string, string>;
