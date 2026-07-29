@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Users, Calendar, Baby } from 'lucide-react';
+import { X, Users, Calendar, Baby, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { Booking, Room, RoomCategory, Tariff, ExtraService, BookingStatus, BookingGuest } from '../../types';
-import { UZS, todayISO, addDaysISO, nightsBetween } from '../../utils';
+import { UZS, todayISO, addDaysISO, nightsBetween, hasDateConflict, exceedsCapacity, exceedsBase } from '../../utils';
 import { useLang } from '../../i18n';
 import type { CurrencyLang } from '../../utils';
 
@@ -13,6 +13,7 @@ interface EditBookingModalProps {
   categories: RoomCategory[];
   tariffs: Tariff[];
   services: ExtraService[];
+  existingBookings: Booking[];
   lang: CurrencyLang;
   onSubmit: (booking: Booking) => void;
 }
@@ -25,6 +26,7 @@ export function EditBookingModal({
   categories,
   tariffs,
   services,
+  existingBookings,
   lang,
   onSubmit,
 }: EditBookingModalProps) {
@@ -103,13 +105,19 @@ export function EditBookingModal({
   const maxAdults = selectedCategory?.maxAdults ?? 10;
   const maxChildren = selectedCategory?.maxChildren ?? 10;
 
+  const editStartOffset = Math.round((new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000);
+  const dateConflict = hasDateConflict(existingBookings, roomId, editStartOffset, nights, initialBooking?.id);
+  const capacityExceeded = selectedCategory ? exceedsCapacity(adults, children, maxAdults, maxChildren) : false;
+  const capacityWarn = selectedCategory ? exceedsBase(adults, children, selectedCategory.baseAdults, selectedCategory.baseKids) : false;
+  const canSave = !!guestName.trim() && !!roomId && nights > 0 && !dateConflict && !capacityExceeded;
+
   const handleGuestNameChange = (idx: number, name: string) => {
     setGuestNames((prev) => prev.map((g, i) => (i === idx ? { ...g, name } : g)));
     if (idx === 0) setGuestName(name);
   };
 
   const handleSubmit = () => {
-    if (!initialBooking || !guestName || !roomId || nights <= 0) return;
+    if (!initialBooking || !guestName.trim() || !roomId || nights <= 0 || dateConflict || capacityExceeded) return;
 
     const startOffset = Math.round(
       (new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000,
@@ -133,7 +141,6 @@ export function EditBookingModal({
     };
 
     onSubmit(updated);
-    onClose();
   };
 
   if (!open || !initialBooking) return null;
@@ -271,6 +278,25 @@ export function EditBookingModal({
             </div>
           </div>
 
+          {dateConflict && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-start gap-2.5">
+              <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-rose-700">{t('val_conflict')}</p>
+            </div>
+          )}
+          {capacityExceeded && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-start gap-2.5">
+              <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-rose-700">{t('val_capacity')} ({adults + children} / {maxAdults + maxChildren})</p>
+            </div>
+          )}
+          {!capacityExceeded && capacityWarn && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2.5">
+              <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-amber-700">{t('val_capacityWarn')}</p>
+            </div>
+          )}
+
           {/* 4. Room + Tariff */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -394,7 +420,7 @@ export function EditBookingModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!guestName || !roomId || nights <= 0}
+            disabled={!canSave}
             className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {t('eb_save')}

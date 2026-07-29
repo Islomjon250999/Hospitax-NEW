@@ -18,9 +18,11 @@ import {
   LogIn,
   LogOut,
   Eye,
+  AlertCircle,
+  AlertTriangle,
 } from 'lucide-react';
 import type { Booking, BookingGuest, BookingStatus, Room, RoomCategory, Tariff, ExtraService, RoomStatus } from '../../types';
-import { UZS, UZS_SHORT, formatDate, pct, todayISO, addDaysISO, nightsBetween, type CurrencyLang } from '../../utils';
+import { UZS, UZS_SHORT, formatDate, pct, todayISO, addDaysISO, nightsBetween, prettyDate, hasDateConflict, exceedsCapacity, exceedsBase, type CurrencyLang } from '../../utils';
 import { Modal } from '../ui';
 import { useToast } from '../../toast';
 import { useLang } from '../../i18n';
@@ -99,7 +101,7 @@ export function Shaxmatka({
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [statusMenuRoomId, setStatusMenuRoomId] = useState<string | null>(null);
   const [statusMenuAnchor, setStatusMenuAnchor] = useState<DOMRect | null>(null);
-  const quickBookingRef = useRef<{ submit: () => void } | null>(null);
+  const quickBookingRef = useRef<{ submit: () => void; canSubmit: boolean } | null>(null);
   const toast = useToast();
 
     const statusStyle: Record<BookingStatus, { bar: string; chip: string; labelKey: string; ring: string }> = {
@@ -507,7 +509,7 @@ export function Shaxmatka({
           quickBooking ? (
             <>
               <button onClick={() => setQuickBooking(null)} className="btn-secondary px-5 py-2.5 text-sm">{t('qb_cancel')}</button>
-              <button onClick={() => quickBookingRef.current?.submit()} className="btn-success px-5 py-2.5 text-sm">
+              <button onClick={() => quickBookingRef.current?.submit()} disabled={!quickBookingRef.current?.canSubmit} className="btn-success px-5 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                 <Plus size={15} /> {t('qb_create')}
               </button>
             </>
@@ -524,6 +526,7 @@ export function Shaxmatka({
             tariffs={data.tariffs}
             services={data.services}
             categories={data.categories}
+            existingBookings={data.bookings}
             onAdd={addBooking}
           />
         )}
@@ -536,6 +539,7 @@ export function Shaxmatka({
         rooms={data.rooms}
         categories={data.categories}
         tariffs={data.tariffs}
+        existingBookings={data.bookings}
         lang={lang}
         onSubmit={(bookings) => {
           bookings.forEach((booking) => {
@@ -585,6 +589,7 @@ export function Shaxmatka({
         categories={data.categories}
         tariffs={data.tariffs}
         services={data.services}
+        existingBookings={data.bookings}
         lang={lang}
         onSubmit={(updatedBooking) => {
           onUpdateData({
@@ -641,11 +646,18 @@ export function Shaxmatka({
         const b = hoveredTip.booking;
         const st = statusStyle[b.status];
         const tariff = hoveredTip.tariff;
-        const tooltipW = 256;
+        const room = data.rooms.find((r) => r.id === b.roomId);
+        const cat = data.categories.find((c) => c.id === room?.categoryId);
+        const allGuests = (b.guests && b.guests.length > 0) ? b.guests : [{ name: b.guestName, type: 'adult' as const }];
+        const adultCount = b.adults ?? allGuests.filter((g) => g.type === 'adult').length;
+        const childCount = b.children ?? allGuests.filter((g) => g.type === 'child').length;
+        const checkInDate = addDaysISO(todayISO(), b.startOffset);
+        const checkOutDate = addDaysISO(checkInDate, b.nights);
+        const tooltipW = 268;
         const left = Math.max(8, Math.min(hoveredTip.rect.left, window.innerWidth - tooltipW - 8));
         return (
           <div
-            className="fixed z-[65] w-64 card p-3.5 shadow-float animate-scale-in text-left pointer-events-none"
+            className="fixed z-[65] w-[268px] card p-3.5 shadow-float animate-scale-in text-left pointer-events-none"
             style={{
               left: `${left}px`,
               top: hoveredTip.showAbove ? `${hoveredTip.rect.top - 6}px` : `${hoveredTip.rect.bottom + 6}px`,
@@ -656,10 +668,41 @@ export function Shaxmatka({
               <p className="text-sm font-bold text-ink-900 truncate">{b.guestName}</p>
               <span className={`chip ${st.chip} shrink-0`}>{t(st.labelKey)}</span>
             </div>
+
+            {allGuests.length > 1 && (
+              <div className="mb-2 rounded-lg bg-ink-50 p-2 space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-ink-400">{t('val_allGuests')} ({allGuests.length})</p>
+                {allGuests.map((g, idx) => (
+                  <div key={idx} className="flex items-center gap-1.5 text-xs">
+                    {g.type === 'adult'
+                      ? <Users size={11} className="text-indigo-500 shrink-0" />
+                      : <Baby size={11} className="text-amber-500 shrink-0" />}
+                    <span className="font-medium text-ink-700 truncate">{g.name || `${t('eb_guest')} ${idx + 1}`}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="space-y-1 text-xs text-ink-600">
-              <TipRow label={t('bd_checkIn')} value={`Day ${b.startOffset >= 0 ? '+' : ''}${b.startOffset}`} />
-              <TipRow label={t('bd_nights')} value={String(b.nights)} />
+              <div className="flex items-center justify-between">
+                <span className="text-ink-400 flex items-center gap-1"><Users size={11} /> {t('val_adults')}</span>
+                <span className="font-semibold text-ink-800">{adultCount}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-400 flex items-center gap-1"><Baby size={11} /> {t('val_children')}</span>
+                <span className="font-semibold text-ink-800">{childCount}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-400">{t('eb_checkInDate')}</span>
+                <span className="font-semibold text-ink-800">{prettyDate(checkInDate)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-ink-400">{t('eb_checkOutDate')}</span>
+                <span className="font-semibold text-ink-800">{prettyDate(checkOutDate)}</span>
+              </div>
+              <TipRow label={t('bd_nights')} value={`${b.nights} ${t('eb_nightsCalc')}`} />
               {tariff && <TipRow label={t('bd_tariffPlan')} value={tariff.name} />}
+              {cat && <TipRow label={t('val_capacityLabel')} value={`${cat.maxAdults + cat.maxChildren}`} />}
               <TipRow label={t('bd_total')} value={UZS(b.total, lang)} />
               <div className="flex items-center justify-between pt-1">
                 <span className="text-ink-400">{t('qb_paymentStatus')}</span>
@@ -837,6 +880,7 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
   tariffs: Tariff[];
   services: ExtraService[];
   categories: RoomCategory[];
+  existingBookings: Booking[];
   onAdd: (b: Omit<Booking, 'id'>) => void;
 }>(function QuickBookingForm({
   roomId,
@@ -845,6 +889,7 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
   tariffs,
   services,
   categories,
+  existingBookings,
   onAdd,
   nights: initNights,
 }, ref) {
@@ -914,9 +959,16 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
   const toggleService = (id: string) =>
     setSelectedServices((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
+  const startOffset = Math.round((new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000);
+  const dateConflict = hasDateConflict(existingBookings, selectedRoomId, startOffset, nights);
+  const capacityExceeded = room && cat ? exceedsCapacity(adults, children, maxAdults, maxChildren) : false;
+  const capacityWarn = room && cat ? exceedsBase(adults, children, cat.baseAdults, cat.baseKids) : false;
+  const canSubmit = !!guest.trim() && !!selectedRoomId && nights > 0 && !dateConflict && !capacityExceeded;
+
+  useImperativeHandle(ref, () => ({ submit, canSubmit }), [guest, selectedRoomId, checkIn, checkOut, nights, dateConflict, capacityExceeded, adults, children, total, channel, phone, tariffId, paymentStatus, selectedServices, guestNames]);
+
   const submit = () => {
-    if (!guest.trim() || !selectedRoomId || nights <= 0) return;
-    const startOffset = Math.round((new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000);
+    if (!guest.trim() || !selectedRoomId || nights <= 0 || dateConflict || capacityExceeded) return;
     onAdd({
       roomId: selectedRoomId,
       guestName: guest.trim(),
@@ -935,8 +987,6 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
       guests: guestNames,
     });
   };
-
-  useImperativeHandle(ref, () => ({ submit }), [guest, selectedRoomId, country, checkIn, checkOut, nights, status, total, channel, phone, tariffId, paymentStatus, selectedServices, adults, children, guestNames]);
 
   return (
     <div className="space-y-4">
@@ -983,6 +1033,26 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
           <div className="input flex items-center justify-center font-bold text-indigo-600 tabular">{nights} {t('eb_nightsCalc')}</div>
         </div>
       </div>
+
+      {/* Validation warnings */}
+      {dateConflict && (
+        <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-start gap-2.5">
+          <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+          <p className="text-sm font-medium text-rose-700">{t('val_conflict')}</p>
+        </div>
+      )}
+      {capacityExceeded && (
+        <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-start gap-2.5">
+          <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+          <p className="text-sm font-medium text-rose-700">{t('val_capacity')} ({adults + children} / {maxAdults + maxChildren})</p>
+        </div>
+      )}
+      {!capacityExceeded && capacityWarn && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2.5">
+          <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-sm font-medium text-amber-700">{t('val_capacityWarn')}</p>
+        </div>
+      )}
 
       {/* 4. Room selection */}
       <div>

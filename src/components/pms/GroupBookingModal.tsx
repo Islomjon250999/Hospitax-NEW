@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Phone, Mail, Users, Baby, Calendar } from 'lucide-react';
-import type { Room, RoomCategory, Tariff, BookingGuest } from '../../types';
-import { UZS, todayISO, addDaysISO, nightsBetween } from '../../utils';
+import { X, Phone, Mail, Users, Baby, Calendar, AlertCircle, AlertTriangle } from 'lucide-react';
+import type { Room, RoomCategory, Tariff, BookingGuest, Booking } from '../../types';
+import { UZS, todayISO, addDaysISO, nightsBetween, hasDateConflict, exceedsCapacity, exceedsBase } from '../../utils';
 import { useLang } from '../../i18n';
 import type { CurrencyLang } from '../../utils';
 
@@ -11,6 +11,7 @@ interface GroupBookingModalProps {
   rooms: Room[];
   categories: RoomCategory[];
   tariffs: Tariff[];
+  existingBookings: Booking[];
   lang: CurrencyLang;
   onSubmit: (bookings: Array<{
     guestName: string;
@@ -35,6 +36,7 @@ export function GroupBookingModal({
   rooms,
   categories,
   tariffs,
+  existingBookings,
   lang,
   onSubmit,
 }: GroupBookingModalProps) {
@@ -65,6 +67,13 @@ export function GroupBookingModal({
   const maxAdults = selectedCategory?.maxAdults ?? 10;
   const maxChildren = selectedCategory?.maxChildren ?? 10;
 
+  const groupStartOffset = Math.round((new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000);
+  const conflictingRooms = selectedRoomIds.filter((rid) => hasDateConflict(existingBookings, rid, groupStartOffset, nights));
+  const capacityExceeded = selectedCategory ? exceedsCapacity(adults, children, maxAdults, maxChildren) : false;
+  const capacityWarn = selectedCategory ? exceedsBase(adults, children, selectedCategory.baseAdults, selectedCategory.baseKids) : false;
+  const leadName = guestNames[0]?.name?.trim() || '';
+  const canSubmit = !!leadName && !!groupName && selectedRoomIds.length > 0 && !!tariffId && nights > 0 && conflictingRooms.length === 0 && !capacityExceeded;
+
   // Sync guest name fields when adult/child counts change
   useEffect(() => {
     setGuestNames((prev) => {
@@ -93,10 +102,7 @@ export function GroupBookingModal({
   };
 
   const handleSubmit = () => {
-    const leadName = guestNames[0]?.name?.trim() || '';
-    if (!leadName || !groupName || selectedRoomIds.length === 0 || !tariffId || nights <= 0) {
-      return;
-    }
+    if (!canSubmit) return;
 
     const startOffset = Math.round(
       (new Date(checkIn + 'T00:00:00').getTime() - new Date(todayISO() + 'T00:00:00').getTime()) / 86400000,
@@ -134,6 +140,23 @@ export function GroupBookingModal({
     setGuestNames([]);
     onClose();
   };
+
+  useEffect(() => {
+    if (!open) {
+      setGroupName('');
+      setPhoneNumber('');
+      setEmail('');
+      setSelectedRoomIds([]);
+      setCheckIn(todayISO());
+      setCheckOut(addDaysISO(todayISO(), 1));
+      setTariffId('');
+      setPaymentStatus('Unpaid');
+      setNotes('');
+      setAdults(1);
+      setChildren(0);
+      setGuestNames([]);
+    }
+  }, [open]);
 
   if (!open) return null;
 
@@ -285,10 +308,11 @@ export function GroupBookingModal({
               {rooms.map((room) => {
                 const cat = categories.find((c) => c.id === room.categoryId);
                 const isSelected = selectedRoomIds.includes(room.id);
+                const hasConflict = isSelected && conflictingRooms.includes(room.id);
                 return (
                   <label
                     key={room.id}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-ink-100 cursor-pointer transition-colors"
+                    className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${hasConflict ? 'bg-rose-50' : 'hover:bg-ink-100'}`}
                   >
                     <input
                       type="checkbox"
@@ -299,11 +323,32 @@ export function GroupBookingModal({
                     <span className="text-sm font-medium text-ink-700">
                       {room.label} ({cat?.name})
                     </span>
+                    {hasConflict && <AlertCircle size={14} className="text-rose-500 ml-auto shrink-0" />}
                   </label>
                 );
               })}
             </div>
           </div>
+
+          {/* Validation warnings */}
+          {conflictingRooms.length > 0 && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-start gap-2.5">
+              <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-rose-700">{t('val_conflict')} ({conflictingRooms.length} {t('gb_selectRooms')})</p>
+            </div>
+          )}
+          {capacityExceeded && (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-start gap-2.5">
+              <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-rose-700">{t('val_capacity')} ({adults + children} / {maxAdults + maxChildren})</p>
+            </div>
+          )}
+          {!capacityExceeded && capacityWarn && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2.5">
+              <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-medium text-amber-700">{t('val_capacityWarn')}</p>
+            </div>
+          )}
 
           {/* Pricing Summary */}
           {selectedRoomIds.length > 0 && (
@@ -392,7 +437,7 @@ export function GroupBookingModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!guestNames[0]?.name?.trim() || !groupName || selectedRoomIds.length === 0 || !tariffId || nights <= 0}
+            disabled={!canSubmit}
             className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {selectedRoomIds.length > 0

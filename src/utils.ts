@@ -64,3 +64,43 @@ export const prettyDate = (iso: string): string => {
 
 export const clamp = (n: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, n));
+
+export interface DateRangeLike {
+  id?: string;
+  roomId: string;
+  startOffset: number;
+  nights: number;
+}
+
+export const hasDateConflict = (
+  bookings: DateRangeLike[],
+  roomId: string,
+  startOffset: number,
+  nights: number,
+  excludeId?: string,
+): boolean => {
+  if (!roomId || nights <= 0) return false;
+  const newEnd = startOffset + nights;
+  return bookings.some((b) => {
+    if (excludeId && b.id === excludeId) return false;
+    if (b.roomId !== roomId) return false;
+    const existingEnd = b.startOffset + b.nights;
+    return startOffset < existingEnd && b.startOffset < newEnd;
+  });
+};
+
+export const exceedsCapacity = (
+  adults: number,
+  children: number,
+  maxAdults: number,
+  maxChildren: number,
+): boolean =>
+  adults > maxAdults || children > maxChildren;
+
+export const exceedsBase = (
+  adults: number,
+  children: number,
+  baseAdults: number,
+  baseKids: number,
+): boolean =>
+  adults > baseAdults || children > baseKids;
