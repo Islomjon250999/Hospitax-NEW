@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useMemo, useState, useRef, useEffect, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -89,6 +89,7 @@ export function Shaxmatka({
   const [hoveredTip, setHoveredTip] = useState<{
     booking: Booking;
     rect: DOMRect;
+    placement: 'above' | 'below';
     tariff?: Tariff;
   } | null>(null);
   const [showInhouse, setShowInhouse] = useState(false);
@@ -462,7 +463,10 @@ export function Shaxmatka({
                                   onMouseEnter={(e) => {
                                     if (statusMenuRoomId) return;
                                     const rect = e.currentTarget.getBoundingClientRect();
-                                    setHoveredTip({ booking: b, rect, tariff });
+                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                    const placement: 'above' | 'below' =
+                                      rect.top > window.innerHeight * 0.5 || spaceBelow < 250 ? 'above' : 'below';
+                                    setHoveredTip({ booking: b, rect, placement, tariff });
                                   }}
                                   onMouseLeave={() => setHoveredTip(null)}
                                   className={`w-full h-full flex items-center px-3 py-1.5 ${st.bar} text-xs text-white font-medium rounded-lg shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
@@ -641,84 +645,17 @@ export function Shaxmatka({
         );
       })()}
 
-      {hoveredTip && (() => {
-        const b = hoveredTip.booking;
-        const st = statusStyle[b.status];
-        const tariff = hoveredTip.tariff;
-        const room = data.rooms.find((r) => r.id === b.roomId);
-        const cat = data.categories.find((c) => c.id === room?.categoryId);
-        const allGuests = (b.guests && b.guests.length > 0) ? b.guests : [{ name: b.guestName, type: 'adult' as const }];
-        const adultCount = b.adults ?? allGuests.filter((g) => g.type === 'adult').length;
-        const childCount = b.children ?? allGuests.filter((g) => g.type === 'child').length;
-        const checkInDate = addDaysISO(todayISO(), b.startOffset);
-        const checkOutDate = addDaysISO(checkInDate, b.nights);
-        const tooltipW = 268;
-        const tooltipHEst = 320;
-        const tipMargin = 8;
-        const left = Math.max(tipMargin, Math.min(hoveredTip.rect.left, window.innerWidth - tooltipW - tipMargin));
-        const spaceAbove = hoveredTip.rect.top;
-        const spaceBelow = window.innerHeight - hoveredTip.rect.bottom;
-        const showAbove = spaceAbove >= tooltipHEst + tipMargin || spaceAbove >= spaceBelow;
-        const top = showAbove
-          ? `${Math.max(tipMargin + tooltipHEst, hoveredTip.rect.top - tipMargin)}px`
-          : `${Math.min(window.innerHeight - tooltipHEst - tipMargin, hoveredTip.rect.bottom + tipMargin)}px`;
-        return (
-          <div
-            className="fixed z-[65] w-[268px] card p-3.5 shadow-float animate-scale-in text-left pointer-events-none"
-            style={{
-              left: `${left}px`,
-              top,
-              transform: showAbove ? 'translateY(-100%)' : 'none',
-            }}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-ink-900 truncate">{b.guestName}</p>
-              <span className={`chip ${st.chip} shrink-0`}>{t(st.labelKey)}</span>
-            </div>
-
-            {allGuests.length > 1 && (
-              <div className="mb-2 rounded-lg bg-ink-50 p-2 space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-ink-400">{t('val_allGuests')} ({allGuests.length})</p>
-                {allGuests.map((g, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5 text-xs">
-                    {g.type === 'adult'
-                      ? <Users size={11} className="text-indigo-500 shrink-0" />
-                      : <Baby size={11} className="text-amber-500 shrink-0" />}
-                    <span className="font-medium text-ink-700 truncate">{g.name || `${t('eb_guest')} ${idx + 1}`}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="space-y-1 text-xs text-ink-600">
-              <div className="flex items-center justify-between">
-                <span className="text-ink-400 flex items-center gap-1"><Users size={11} /> {t('val_adults')}</span>
-                <span className="font-semibold text-ink-800">{adultCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-ink-400 flex items-center gap-1"><Baby size={11} /> {t('val_children')}</span>
-                <span className="font-semibold text-ink-800">{childCount}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-ink-400">{t('eb_checkInDate')}</span>
-                <span className="font-semibold text-ink-800">{prettyDate(checkInDate)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-ink-400">{t('eb_checkOutDate')}</span>
-                <span className="font-semibold text-ink-800">{prettyDate(checkOutDate)}</span>
-              </div>
-              <TipRow label={t('bd_nights')} value={`${b.nights} ${t('eb_nightsCalc')}`} />
-              {tariff && <TipRow label={t('bd_tariffPlan')} value={tariff.name} />}
-              {cat && <TipRow label={t('val_capacityLabel')} value={`${cat.maxAdults + cat.maxChildren}`} />}
-              <TipRow label={t('bd_total')} value={UZS(b.total, lang)} />
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-ink-400">{t('qb_paymentStatus')}</span>
-                <span className={`chip ${paymentStyle[b.paymentStatus].chip}`}>{t(paymentStyle[b.paymentStatus].labelKey)}</span>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {hoveredTip && (
+        <BookingTooltip
+          key={hoveredTip.booking.id}
+          booking={hoveredTip.booking}
+          rect={hoveredTip.rect}
+          placement={hoveredTip.placement}
+          tariff={hoveredTip.tariff}
+          rooms={data.rooms}
+          categories={data.categories}
+        />
+      )}
     </div>
   );
 }
@@ -770,6 +707,132 @@ function GuestListModal({
     </div>
   );
 }
+
+function BookingTooltip({
+  booking: b,
+  rect,
+  placement,
+  tariff,
+  rooms,
+  categories,
+}: {
+  booking: Booking;
+  rect: DOMRect;
+  placement: 'above' | 'below';
+  tariff?: Tariff;
+  rooms: Room[];
+  categories: RoomCategory[];
+}) {
+  const { lang, t } = useLang();
+  const _lang = lang as CurrencyLang;
+  const tipRef = useRef<HTMLDivElement>(null);
+  const [measuredH, setMeasuredH] = useState(0);
+  const [visible, setVisible] = useState(false);
+
+  useLayoutEffect(() => {
+    if (tipRef.current) {
+      setMeasuredH(tipRef.current.offsetHeight);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (measuredH > 0) {
+      const raf = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [measuredH]);
+
+  const tooltipW = 268;
+  const gap = 8;
+  const margin = 8;
+  const left = Math.max(margin, Math.min(rect.left, window.innerWidth - tooltipW - margin));
+  const effectiveH = measuredH || 320;
+  const top = placement === 'above'
+    ? Math.max(margin, rect.top - effectiveH - gap)
+    : Math.min(window.innerHeight - effectiveH - margin, rect.bottom + gap);
+
+  const st = statusStyleTooltip[b.status];
+  const room = rooms.find((r) => r.id === b.roomId);
+  const cat = categories.find((c) => c.id === room?.categoryId);
+  const allGuests = (b.guests && b.guests.length > 0) ? b.guests : [{ name: b.guestName, type: 'adult' as const }];
+  const adultCount = b.adults ?? allGuests.filter((g) => g.type === 'adult').length;
+  const childCount = b.children ?? allGuests.filter((g) => g.type === 'child').length;
+  const checkInDate = addDaysISO(todayISO(), b.startOffset);
+  const checkOutDate = addDaysISO(checkInDate, b.nights);
+
+  return (
+    <div
+      ref={tipRef}
+      className="fixed z-[65] w-[268px] card p-3.5 shadow-float text-left pointer-events-none"
+      style={{
+        left: `${left}px`,
+        top: `${top}px`,
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 120ms ease-out',
+      }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-bold text-ink-900 truncate">{b.guestName}</p>
+        <span className={`chip ${st.chip} shrink-0`}>{t(st.labelKey)}</span>
+      </div>
+
+      {allGuests.length > 1 && (
+        <div className="mb-2 rounded-lg bg-ink-50 p-2 space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-ink-400">{t('val_allGuests')} ({allGuests.length})</p>
+          {allGuests.map((g, idx) => (
+            <div key={idx} className="flex items-center gap-1.5 text-xs">
+              {g.type === 'adult'
+                ? <Users size={11} className="text-indigo-500 shrink-0" />
+                : <Baby size={11} className="text-amber-500 shrink-0" />}
+              <span className="font-medium text-ink-700 truncate">{g.name || `${t('eb_guest')} ${idx + 1}`}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-1 text-xs text-ink-600">
+        <div className="flex items-center justify-between">
+          <span className="text-ink-400 flex items-center gap-1"><Users size={11} /> {t('val_adults')}</span>
+          <span className="font-semibold text-ink-800">{adultCount}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-ink-400 flex items-center gap-1"><Baby size={11} /> {t('val_children')}</span>
+          <span className="font-semibold text-ink-800">{childCount}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-ink-400">{t('eb_checkInDate')}</span>
+          <span className="font-semibold text-ink-800">{prettyDate(checkInDate)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-ink-400">{t('eb_checkOutDate')}</span>
+          <span className="font-semibold text-ink-800">{prettyDate(checkOutDate)}</span>
+        </div>
+        <TipRow label={t('bd_nights')} value={`${b.nights} ${t('eb_nightsCalc')}`} />
+        {tariff && <TipRow label={t('bd_tariffPlan')} value={tariff.name} />}
+        {cat && <TipRow label={t('val_capacityLabel')} value={`${cat.maxAdults + cat.maxChildren}`} />}
+        <TipRow label={t('bd_total')} value={UZS(b.total, _lang)} />
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-ink-400">{t('qb_paymentStatus')}</span>
+          <span className={`chip ${paymentStyleTooltip[b.paymentStatus].chip}`}>{t(paymentStyleTooltip[b.paymentStatus].labelKey)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const statusStyleTooltip: Record<BookingStatus, { bar: string; chip: string; labelKey: string; ring: string }> = {
+  'Confirmed': { bar: 'bg-emerald-500', chip: 'text-emerald-700 bg-emerald-50', labelKey: 'status_confirmed', ring: 'ring-emerald-500/30' },
+  'Checked-in': { bar: 'bg-indigo-500', chip: 'text-indigo-700 bg-indigo-50', labelKey: 'status_checkedIn', ring: 'ring-indigo-500/30' },
+  'Pending': { bar: 'bg-amber-500', chip: 'text-amber-700 bg-amber-50', labelKey: 'status_pending', ring: 'ring-amber-500/30' },
+  'Checked-out': { bar: 'bg-slate-400', chip: 'text-slate-600 bg-slate-100', labelKey: 'status_checkedOut', ring: 'ring-slate-400/30' },
+  'Blocked': { bar: 'bg-rose-500', chip: 'text-rose-700 bg-rose-50', labelKey: 'status_blocked', ring: 'ring-rose-500/30' },
+};
+
+const paymentStyleTooltip: Record<string, { chip: string; labelKey: string }> = {
+  Paid: { chip: 'text-emerald-700 bg-emerald-50', labelKey: 'pay_paid' },
+  Partial: { chip: 'text-amber-700 bg-amber-50', labelKey: 'pay_partial' },
+  Unpaid: { chip: 'text-rose-700 bg-rose-50', labelKey: 'pay_unpaid' },
+};
 
 function TipRow({ label, value }: { label: string; value: string }) {
   return (
