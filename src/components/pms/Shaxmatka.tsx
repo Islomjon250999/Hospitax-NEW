@@ -940,6 +940,51 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
 
   return (
     <div className="space-y-4">
+      {/* 1. Guest Counts — Adults & Children */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="label"><span className="inline-flex items-center gap-1.5"><Users size={12} className="text-ink-400" />{t('eb_adults')}</span></label>
+          <input type="number" min={1} max={maxAdults} value={adults} onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))} className="input" />
+        </div>
+        <div>
+          <label className="label"><span className="inline-flex items-center gap-1.5"><Baby size={12} className="text-ink-400" />{t('eb_children')}</span></label>
+          <input type="number" min={0} max={maxChildren} value={children} onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))} className="input" />
+        </div>
+      </div>
+
+      {/* 2. Dynamic Guest Names */}
+      <div>
+        <label className="label">{t('eb_guestNames')}</label>
+        <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
+          {guestNames.map((g, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <span className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${g.type === 'adult' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
+                {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
+                {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
+              </span>
+              <input type="text" value={g.name} onChange={(e) => handleGuestNameChange(idx, e.target.value)} placeholder={t('eb_guestNamePh')} className="input flex-1 !py-1.5 !text-xs" autoFocus={idx === 0} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. Dates + Nights summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label"><span className="inline-flex items-center gap-1.5"><Calendar size={12} className="text-indigo-500" />{t('eb_checkInDate')}</span></label>
+          <input type="date" value={checkIn} onChange={(e) => { const v = e.target.value; if (v >= checkOut) setCheckOut(addDaysISO(v, 1)); setCheckIn(v); }} className="input" />
+        </div>
+        <div>
+          <label className="label"><span className="inline-flex items-center gap-1.5"><Calendar size={12} className="text-indigo-500" />{t('eb_checkOutDate')}</span></label>
+          <input type="date" value={checkOut} min={addDaysISO(checkIn, 1)} onChange={(e) => { if (e.target.value > checkIn) setCheckOut(e.target.value); }} className="input" />
+        </div>
+        <div>
+          <label className="label">{t('qb_nights')}</label>
+          <div className="input flex items-center justify-center font-bold text-indigo-600 tabular">{nights} {t('eb_nightsCalc')}</div>
+        </div>
+      </div>
+
+      {/* 4. Room selection */}
       <div>
         <label className="label">{t('bd_room')}</label>
         <select value={selectedRoomId} onChange={(e) => handleRoomChange(e.target.value)} className="input">
@@ -961,28 +1006,6 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="sm:col-span-2">
-          <label className="label">{t('qb_guest')}</label>
-          <input value={guest} onChange={(e) => { setGuest(e.target.value); handleGuestNameChange(0, e.target.value); }} placeholder={t('qb_guestPh')} className="input" autoFocus />
-        </div>
-        <div>
-          <label className="label"><span className="inline-flex items-center gap-1.5"><Calendar size={12} className="text-indigo-500" />{t('eb_checkInDate')}</span></label>
-          <input type="date" value={checkIn} onChange={(e) => { const v = e.target.value; if (v >= checkOut) setCheckOut(addDaysISO(v, 1)); setCheckIn(v); }} className="input" />
-        </div>
-        <div>
-          <label className="label"><span className="inline-flex items-center gap-1.5"><Calendar size={12} className="text-indigo-500" />{t('eb_checkOutDate')}</span></label>
-          <input type="date" value={checkOut} min={addDaysISO(checkIn, 1)} onChange={(e) => { if (e.target.value > checkIn) setCheckOut(e.target.value); }} className="input" />
-        </div>
-        <div>
-          <label className="label">{t('qb_nights')}</label>
-          <div className="input flex items-center justify-center font-bold text-indigo-600 tabular">{nights} {t('eb_nightsCalc')}</div>
-        </div>
-        <div>
-          <label className="label">{t('qb_country')}</label>
-          <select value={country} onChange={(e) => setCountry(e.target.value)} className="input">
-            {['Uzbekistan', 'Russia', 'Kazakhstan', 'Turkey', 'Germany', 'UK', 'China', 'UAE', 'Italy', 'South Korea'].map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
         <div>
           <label className="label">{t('qb_tariff')}</label>
           <select value={tariffId} onChange={(e) => setTariffId(e.target.value)} className="input">
@@ -1008,41 +1031,17 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
             {['Unpaid', 'Partial', 'Paid'].map((s) => <option key={s} value={s}>{t(`pay_${s.toLowerCase()}`)}</option>)}
           </select>
         </div>
-        <div className="sm:col-span-2">
+        <div>
+          <label className="label">{t('qb_country')}</label>
+          <select value={country} onChange={(e) => setCountry(e.target.value)} className="input">
+            {['Uzbekistan', 'Russia', 'Kazakhstan', 'Turkey', 'Germany', 'UK', 'China', 'UAE', 'Italy', 'South Korea'].map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
           <label className="label">{t('qb_phone')}</label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 90 123 45 67" className="input" />
         </div>
       </div>
-
-      {/* Adult & Child counters */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="label"><span className="inline-flex items-center gap-1.5"><Users size={12} className="text-ink-400" />{t('eb_adults')}</span></label>
-          <input type="number" min={1} max={maxAdults} value={adults} onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))} className="input" />
-        </div>
-        <div>
-          <label className="label"><span className="inline-flex items-center gap-1.5"><Baby size={12} className="text-ink-400" />{t('eb_children')}</span></label>
-          <input type="number" min={0} max={maxChildren} value={children} onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))} className="input" />
-        </div>
-      </div>
-
-      {/* Dynamic guest name fields */}
-      {(adults + children) > 1 && (
-        <div>
-          <label className="label">{t('eb_guestNames')}</label>
-          <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
-            {guestNames.map((g, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <span className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${g.type === 'adult' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
-                  {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
-                  {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
-                </span>
-                <input type="text" value={g.name} onChange={(e) => handleGuestNameChange(idx, e.target.value)} placeholder={t('eb_guestNamePh')} className="input flex-1 !py-1.5 !text-xs" />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div>
         <label className="label">{t('qb_addonServices')}</label>

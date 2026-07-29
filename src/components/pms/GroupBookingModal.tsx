@@ -40,7 +40,6 @@ export function GroupBookingModal({
 }: GroupBookingModalProps) {
   const { t } = useLang();
   const [groupName, setGroupName] = useState('');
-  const [leadGuestName, setLeadGuestName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([]);
@@ -75,7 +74,7 @@ export function GroupBookingModal({
       const next = [...prev];
       while (next.length < target) {
         const idx = next.length;
-        next.push({ name: idx === 0 ? leadGuestName : '', type: idx < adults ? 'adult' : 'child' });
+        next.push({ name: idx === 0 ? (prev[0]?.name ?? '') : '', type: idx < adults ? 'adult' : 'child' });
       }
       while (next.length > target) next.pop();
       return next.map((g, i) => ({ ...g, type: i < adults ? 'adult' as const : 'child' as const }));
@@ -84,7 +83,7 @@ export function GroupBookingModal({
 
   const handleGuestNameChange = (idx: number, name: string) => {
     setGuestNames((prev) => prev.map((g, i) => (i === idx ? { ...g, name } : g)));
-    if (idx === 0) setLeadGuestName(name);
+
   };
 
   const toggleRoom = (roomId: string) => {
@@ -94,7 +93,8 @@ export function GroupBookingModal({
   };
 
   const handleSubmit = () => {
-    if (!leadGuestName || !groupName || selectedRoomIds.length === 0 || !tariffId || nights <= 0) {
+    const leadName = guestNames[0]?.name?.trim() || '';
+    if (!leadName || !groupName || selectedRoomIds.length === 0 || !tariffId || nights <= 0) {
       return;
     }
 
@@ -121,7 +121,6 @@ export function GroupBookingModal({
     onSubmit(bookings);
 
     setGroupName('');
-    setLeadGuestName('');
     setPhoneNumber('');
     setEmail('');
     setSelectedRoomIds([]);
@@ -154,89 +153,71 @@ export function GroupBookingModal({
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-          {/* Group Information */}
-          <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_groupName')} *</label>
-            <input
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder={t('gb_groupNamePh')}
-              className="input w-full"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_leadGuest')} *</label>
-            <input
-              type="text"
-              value={leadGuestName}
-              onChange={(e) => {
-                setLeadGuestName(e.target.value);
-                handleGuestNameChange(0, e.target.value);
-              }}
-              placeholder={t('gb_leadGuestPh')}
-              className="input w-full"
-            />
-          </div>
-
+          {/* 1. Guest Counts — Adults & Children */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2 flex items-center gap-1">
-                <Phone size={14} /> {t('eb_phone')}
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users size={14} className="text-ink-400" />
+                  {t('eb_adults')}
+                </span>
               </label>
               <input
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+998 90 123 45 67"
+                type="number"
+                min={1}
+                max={maxAdults}
+                value={adults}
+                onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))}
                 className="input w-full"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2 flex items-center gap-1">
-                <Mail size={14} /> Email
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Baby size={14} className="text-ink-400" />
+                  {t('eb_children')}
+                </span>
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="mehmon@example.com"
+                type="number"
+                min={0}
+                max={maxChildren}
+                value={children}
+                onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))}
                 className="input w-full"
               />
             </div>
           </div>
 
-          {/* Room Selection */}
+          {/* 2. Dynamic Guest Names */}
           <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-3">
-              {t('gb_selectRooms')} * ({selectedRoomIds.length})
-            </label>
-            <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border border-ink-200 rounded-lg p-3 bg-ink-50">
-              {rooms.map((room) => {
-                const cat = categories.find((c) => c.id === room.categoryId);
-                const isSelected = selectedRoomIds.includes(room.id);
-                return (
-                  <label
-                    key={room.id}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-ink-100 cursor-pointer transition-colors"
+            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_guestNames')}</label>
+            <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
+              {guestNames.map((g, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span
+                    className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${
+                      g.type === 'adult'
+                        ? 'bg-indigo-100 text-indigo-600'
+                        : 'bg-amber-100 text-amber-600'
+                    }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleRoom(room.id)}
-                      className="cursor-pointer"
-                    />
-                    <span className="text-sm font-medium text-ink-700">
-                      {room.label} ({cat?.name})
-                    </span>
-                  </label>
-                );
-              })}
+                    {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
+                    {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
+                  </span>
+                  <input
+                    type="text"
+                    value={g.name}
+                    onChange={(e) => handleGuestNameChange(idx, e.target.value)}
+                    placeholder={t('eb_guestNamePh')}
+                    className="input flex-1 !py-1.5 !text-xs"
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Check-in / Check-out Date Pickers */}
+          {/* 3. Dates + Nights/Price Summary */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-ink-700 mb-2">
@@ -275,7 +256,6 @@ export function GroupBookingModal({
             </div>
           </div>
 
-          {/* Nights summary + Tariff */}
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-xl bg-indigo-50 px-4 py-3 flex flex-col justify-center">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-400">{t('eb_nights')}</p>
@@ -296,71 +276,34 @@ export function GroupBookingModal({
             </div>
           </div>
 
-          {/* Adult & Child counters */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">
-                <span className="inline-flex items-center gap-1.5">
-                  <Users size={14} className="text-ink-400" />
-                  {t('eb_adults')}
-                </span>
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={maxAdults}
-                value={adults}
-                onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))}
-                className="input w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">
-                <span className="inline-flex items-center gap-1.5">
-                  <Baby size={14} className="text-ink-400" />
-                  {t('eb_children')}
-                </span>
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={maxChildren}
-                value={children}
-                onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))}
-                className="input w-full"
-              />
+          {/* 4. Room Selection */}
+          <div>
+            <label className="block text-sm font-semibold text-ink-700 mb-3">
+              {t('gb_selectRooms')} * ({selectedRoomIds.length})
+            </label>
+            <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border border-ink-200 rounded-lg p-3 bg-ink-50">
+              {rooms.map((room) => {
+                const cat = categories.find((c) => c.id === room.categoryId);
+                const isSelected = selectedRoomIds.includes(room.id);
+                return (
+                  <label
+                    key={room.id}
+                    className="flex items-center gap-2 p-2 rounded hover:bg-ink-100 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleRoom(room.id)}
+                      className="cursor-pointer"
+                    />
+                    <span className="text-sm font-medium text-ink-700">
+                      {room.label} ({cat?.name})
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           </div>
-
-          {/* Dynamic guest name fields */}
-          {(adults + children) > 1 && (
-            <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_guestNames')}</label>
-              <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
-                {guestNames.map((g, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <span
-                      className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${
-                        g.type === 'adult'
-                          ? 'bg-indigo-100 text-indigo-600'
-                          : 'bg-amber-100 text-amber-600'
-                      }`}
-                    >
-                      {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
-                      {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
-                    </span>
-                    <input
-                      type="text"
-                      value={g.name}
-                      onChange={(e) => handleGuestNameChange(idx, e.target.value)}
-                      placeholder={t('eb_guestNamePh')}
-                      className="input flex-1 !py-1.5 !text-xs"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Pricing Summary */}
           {selectedRoomIds.length > 0 && (
@@ -380,6 +323,47 @@ export function GroupBookingModal({
             </div>
           )}
 
+          {/* 5. Group Information */}
+          <div>
+            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_groupName')} *</label>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder={t('gb_groupNamePh')}
+              className="input w-full"
+            />
+          </div>
+
+          {/* 6. Phone + Email */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2 flex items-center gap-1">
+                <Phone size={14} /> {t('eb_phone')}
+              </label>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+998 90 123 45 67"
+                className="input w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-ink-700 mb-2 flex items-center gap-1">
+                <Mail size={14} /> Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="mehmon@example.com"
+                className="input w-full"
+              />
+            </div>
+          </div>
+
+          {/* 7. Payment Status */}
           <div>
             <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_paymentStatus')}</label>
             <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value as 'Paid' | 'Partial' | 'Unpaid')} className="input w-full">
@@ -389,6 +373,7 @@ export function GroupBookingModal({
             </select>
           </div>
 
+          {/* 8. Notes */}
           <div>
             <label className="block text-sm font-semibold text-ink-700 mb-2">{t('gb_notes')}</label>
             <textarea
@@ -407,7 +392,7 @@ export function GroupBookingModal({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!leadGuestName || !groupName || selectedRoomIds.length === 0 || !tariffId || nights <= 0}
+            disabled={!guestNames[0]?.name?.trim() || !groupName || selectedRoomIds.length === 0 || !tariffId || nights <= 0}
             className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {selectedRoomIds.length > 0

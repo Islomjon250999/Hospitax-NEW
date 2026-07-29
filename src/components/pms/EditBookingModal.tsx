@@ -149,62 +149,71 @@ export function EditBookingModal({
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-          <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_guest')} *</label>
-            <input
-              type="text"
-              value={guestName}
-              onChange={(e) => {
-                setGuestName(e.target.value);
-                handleGuestNameChange(0, e.target.value);
-              }}
-              placeholder={t('eb_guestPh')}
-              className="input w-full"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_phone')}</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+998 90 123 45 67"
-              className="input w-full"
-            />
-          </div>
-
+          {/* 1. Guest Counts — Adults & Children */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_room')} *</label>
-              <select value={roomId} onChange={(e) => setRoomId(e.target.value)} className="input w-full">
-                <option value="">{t('eb_selectRoom')}</option>
-                {rooms.map((room) => {
-                  const cat = categories.find((c) => c.id === room.categoryId);
-                  return (
-                    <option key={room.id} value={room.id}>
-                      {room.label} - {cat?.name}
-                    </option>
-                  );
-                })}
-              </select>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users size={14} className="text-ink-400" />
+                  {t('eb_adults')}
+                </span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={maxAdults}
+                value={adults}
+                onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))}
+                className="input w-full"
+              />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_tariff')}</label>
-              <select value={tariffId} onChange={(e) => setTariffId(e.target.value)} className="input w-full">
-                <option value="">{t('eb_selectTariff')}</option>
-                {tariffs
-                  .filter((tm) => !room || tm.categoryId === room.categoryId)
-                  .map((tariff) => (
-                    <option key={tariff.id} value={tariff.id}>
-                      {tariff.name} - {UZS(tariff.dailyRate, lang)}/kun
-                    </option>
-                  ))}
-              </select>
+              <label className="block text-sm font-semibold text-ink-700 mb-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <Baby size={14} className="text-ink-400" />
+                  {t('eb_children')}
+                </span>
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={maxChildren}
+                value={children}
+                onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))}
+                className="input w-full"
+              />
             </div>
           </div>
 
-          {/* Check-in / Check-out Date Pickers */}
+          {/* 2. Dynamic Guest Names */}
+          <div>
+            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_guestNames')}</label>
+            <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
+              {guestNames.map((g, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span
+                    className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${
+                      g.type === 'adult'
+                        ? 'bg-indigo-100 text-indigo-600'
+                        : 'bg-amber-100 text-amber-600'
+                    }`}
+                  >
+                    {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
+                    {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
+                  </span>
+                  <input
+                    type="text"
+                    value={g.name}
+                    onChange={(e) => handleGuestNameChange(idx, e.target.value)}
+                    placeholder={t('eb_guestNamePh')}
+                    className="input flex-1 !py-1.5 !text-xs"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 3. Dates + Nights/Price Summary */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-ink-700 mb-2">
@@ -245,7 +254,6 @@ export function EditBookingModal({
             </div>
           </div>
 
-          {/* Nights summary + Rate */}
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-xl bg-indigo-50 px-4 py-3 flex flex-col justify-center">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-400">{t('eb_nights')}</p>
@@ -263,73 +271,50 @@ export function EditBookingModal({
             </div>
           </div>
 
-          {/* Guest counts */}
+          {/* 4. Room + Tariff */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">
-                <span className="inline-flex items-center gap-1.5">
-                  <Users size={14} className="text-ink-400" />
-                  {t('eb_adults')}
-                </span>
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={maxAdults}
-                value={adults}
-                onChange={(e) => setAdults(Math.min(maxAdults, Math.max(1, parseInt(e.target.value) || 1)))}
-                className="input w-full"
-              />
+              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_room')} *</label>
+              <select value={roomId} onChange={(e) => setRoomId(e.target.value)} className="input w-full">
+                <option value="">{t('eb_selectRoom')}</option>
+                {rooms.map((room) => {
+                  const cat = categories.find((c) => c.id === room.categoryId);
+                  return (
+                    <option key={room.id} value={room.id}>
+                      {room.label} - {cat?.name}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">
-                <span className="inline-flex items-center gap-1.5">
-                  <Baby size={14} className="text-ink-400" />
-                  {t('eb_children')}
-                </span>
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={maxChildren}
-                value={children}
-                onChange={(e) => setChildren(Math.min(maxChildren, Math.max(0, parseInt(e.target.value) || 0)))}
-                className="input w-full"
-              />
+              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_tariff')}</label>
+              <select value={tariffId} onChange={(e) => setTariffId(e.target.value)} className="input w-full">
+                <option value="">{t('eb_selectTariff')}</option>
+                {tariffs
+                  .filter((tm) => !room || tm.categoryId === room.categoryId)
+                  .map((tariff) => (
+                    <option key={tariff.id} value={tariff.id}>
+                      {tariff.name} - {UZS(tariff.dailyRate, lang)}/kun
+                    </option>
+                  ))}
+              </select>
             </div>
           </div>
 
-          {/* Dynamic guest name fields */}
-          {(adults + children) > 1 && (
-            <div>
-              <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_guestNames')}</label>
-              <div className="space-y-2 rounded-xl border border-ink-200 p-3 bg-ink-50/50">
-                {guestNames.map((g, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <span
-                      className={`shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg ${
-                        g.type === 'adult'
-                          ? 'bg-indigo-100 text-indigo-600'
-                          : 'bg-amber-100 text-amber-600'
-                      }`}
-                    >
-                      {g.type === 'adult' ? <Users size={12} /> : <Baby size={12} />}
-                      {t('eb_guest')} {idx + 1} ({g.type === 'adult' ? t('eb_guestAdult') : t('eb_guestChild')})
-                    </span>
-                    <input
-                      type="text"
-                      value={g.name}
-                      onChange={(e) => handleGuestNameChange(idx, e.target.value)}
-                      placeholder={t('eb_guestNamePh')}
-                      className="input flex-1 !py-1.5 !text-xs"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* 5. Phone */}
+          <div>
+            <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_phone')}</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+998 90 123 45 67"
+              className="input w-full"
+            />
+          </div>
 
-          {/* Extra Services */}
+          {/* 6. Extra Services */}
           {services.filter((s) => s.active).length > 0 && (
             <div>
               <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_addonServices')}</label>
