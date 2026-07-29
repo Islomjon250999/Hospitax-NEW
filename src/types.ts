@@ -1,9 +1,54 @@
 // ---- Shared domain types for HospitaX multi-tenant platform ----
 
+export type UserRole = 'ceo' | 'super_admin' | 'manager' | 'receptionist' | 'housekeeping';
+
+export type AppView = 'landing' | 'ceo' | 'super_admin' | 'manager' | 'receptionist' | 'housekeeping';
+
 export type ViewMode = 'admin' | 'client';
 export type AdminTab = 'overview' | 'tenants' | 'billing' | 'settings';
 export type ClientTab = 'pms' | 'chm' | 'be';
 export type PmsSubTab = 'shaxmatka' | 'roomtypes' | 'tariffs' | 'services';
+
+export interface StaffAccount {
+  id: string;
+  hotelId: string | null;
+  fullName: string;
+  email: string;
+  role: UserRole;
+  phone: string;
+  active: boolean;
+}
+
+export interface Hotel {
+  id: string;
+  name: string;
+  type: string;
+  city: string;
+  roomsCount: number;
+  plan: string;
+  status: string;
+  mrr: number;
+  adminName: string;
+  phone: string;
+  email: string;
+  address: string;
+  subscriptionStatus: string;
+  trialEndsAt: string | null;
+  createdAt: string;
+}
+
+export interface ConnectionRequest {
+  id: string;
+  hotelName: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  city: string;
+  roomCount: number;
+  message: string;
+  status: 'New' | 'Contacted' | 'Connected' | 'Rejected';
+  createdAt: string;
+}
 
 export type SubscriptionPlan = 'Basic' | 'Pro' | 'Enterprise';
 export type PropertyStatus = 'Active' | 'Trial' | 'Suspended' | 'Onboarding';

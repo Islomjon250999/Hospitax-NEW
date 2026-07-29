@@ -21,9 +21,10 @@ const SUB_TABS: { id: PmsSubTab; labelKey: string; subLabelKey: string; icon: Lu
   { id: 'services', labelKey: 'pms_services', subLabelKey: 'pms_services_sub', icon: ConciergeBell },
 ];
 
-export function PmsModule() {
+export function PmsModule({ restrictTo }: { restrictTo?: PmsSubTab[] }) {
   const { lang, t } = useLang();
-  const [subTab, setSubTab] = useState<PmsSubTab>('shaxmatka');
+  const visibleTabs = restrictTo ? SUB_TABS.filter((tab) => restrictTo.includes(tab.id)) : SUB_TABS;
+  const [subTab, setSubTab] = useState<PmsSubTab>(visibleTabs[0]?.id ?? 'shaxmatka');
 
   const [data, setData] = useState<PmsData>({
     rooms: [],
@@ -71,7 +72,7 @@ export function PmsModule() {
 
       {/* ---- Sub-tab navigation ---- */}
       <div className="flex items-center gap-1 border-b border-ink-200 overflow-x-auto">
-        {SUB_TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           const on = subTab === tab.id;
           return (

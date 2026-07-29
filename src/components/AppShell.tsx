@@ -1,8 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import {
   Building2,
-  ShieldCheck,
-  Store,
   Bell,
   Search,
   Menu,
@@ -16,36 +14,57 @@ import {
   Sparkles,
   Globe,
   Check,
+  Crown,
+  ShieldCheck,
+  Store,
+  Calendar,
   type LucideIcon,
 } from 'lucide-react';
-import type { ViewMode } from '../types';
 import { notifications as seedNotifs } from '../mockData';
 import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel, Avatar, SlideOver, FlagIcon } from './ui';
 import { useToast } from '../toast';
 import { useLang, LANGUAGES } from '../i18n';
+import { useAuth, ROLE_LABELS } from '../lib/auth';
+import type { UserRole } from '../types';
+
+const ROLE_ICONS: Record<UserRole, LucideIcon> = {
+  ceo: Crown,
+  super_admin: ShieldCheck,
+  manager: Store,
+  receptionist: Store,
+  housekeeping: Sparkles,
+};
+
+const ROLE_ACCENTS: Record<UserRole, string> = {
+  ceo: 'from-amber-500 to-orange-500 shadow-amber-200/40',
+  super_admin: 'from-indigo-500 to-violet-500 shadow-indigo-200/40',
+  manager: 'from-emerald-500 to-teal-500 shadow-emerald-200/40',
+  receptionist: 'from-sky-500 to-blue-500 shadow-sky-200/40',
+  housekeeping: 'from-violet-500 to-purple-500 shadow-violet-200/40',
+};
 
 export function AppShell({
-  view,
-  onViewChange,
   children,
   notifOpen,
   setNotifOpen,
   settingsOpen,
   setSettingsOpen,
   onMenu,
+  onLogout,
 }: {
-  view: ViewMode;
-  onViewChange: (v: ViewMode) => void;
   children: ReactNode;
   notifOpen: boolean;
   setNotifOpen: (v: boolean) => void;
   settingsOpen: boolean;
   setSettingsOpen: (v: boolean) => void;
   onMenu: () => void;
+  onLogout: () => void;
 }) {
   const toast = useToast();
   const { lang, setLang, t } = useLang();
+  const { user, login, logout } = useAuth();
   const [notifs, setNotifs] = useState(seedNotifs);
+  const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
   const unread = notifs.filter((n) => !n.read).length;
 
   const markAllRead = () => {
@@ -53,9 +72,19 @@ export function AppShell({
     toast(t('nav_markAllRead'), 'info');
   };
 
+  const handleLogout = () => {
+    logout();
+    onLogout();
+  };
+
+  const langKey = lang as 'uz' | 'ru' | 'en';
+  const roleIcon = user ? ROLE_ICONS[user.role] : Store;
+  const RoleIcon = roleIcon;
+  const allRoles: UserRole[] = ['ceo', 'super_admin', 'manager', 'receptionist', 'housekeeping'];
+
   return (
     <div className="min-h-screen flex flex-col bg-ink-50">
-      {/* ---- Top navigation with view switcher ---- */}
+      {/* ---- Top navigation ---- */}
       <header className="sticky top-0 z-40 bg-white border-b border-ink-200">
         <div className="h-16 px-4 sm:px-6 lg:px-8 flex items-center gap-3 max-w-[1400px] mx-auto">
           <button onClick={onMenu} className="lg:hidden btn-ghost h-9 w-9 !p-0 rounded-lg shrink-0">
@@ -64,7 +93,7 @@ export function AppShell({
 
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-200/50">
+            <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${user ? ROLE_ACCENTS[user.role] : 'from-indigo-500 to-violet-500'} flex items-center justify-center shadow-lg`}>
               <Building2 size={20} className="text-white" />
             </div>
             <div className="leading-tight hidden sm:block">
@@ -75,21 +104,13 @@ export function AppShell({
             </div>
           </div>
 
-          {/* View switcher */}
-          <div className="ml-2 sm:ml-6 flex p-1 bg-ink-100 rounded-xl gap-1 shrink-0">
-            <ViewSwitchBtn
-              active={view === 'admin'}
-              onClick={() => onViewChange('admin')}
-              icon={ShieldCheck}
-              label={t('nav_superAdmin')}
-            />
-            <ViewSwitchBtn
-              active={view === 'client'}
-              onClick={() => onViewChange('client')}
-              icon={Store}
-              label={t('nav_hotelClient')}
-            />
-          </div>
+          {/* Role badge */}
+          {user && (
+            <div className="ml-2 sm:ml-4 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-ink-100 shrink-0">
+              <RoleIcon size={15} className="text-ink-500" />
+              <span className="text-xs font-bold text-ink-700 hidden sm:inline">{ROLE_LABELS[user.role][langKey]}</span>
+            </div>
+          )}
 
           {/* Search */}
           <div className="hidden md:flex flex-1 max-w-md mx-2">
@@ -116,13 +137,15 @@ export function AppShell({
                 </span>
               )}
             </button>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="btn-ghost h-9 w-9 !p-0 rounded-lg hidden sm:flex"
-              title={t('nav_settings')}
-            >
-              <Settings size={18} />
-            </button>
+            {user?.role !== 'receptionist' && user?.role !== 'housekeeping' && (
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="btn-ghost h-9 w-9 !p-0 rounded-lg hidden sm:flex"
+                title={t('nav_settings')}
+              >
+                <Settings size={18} />
+              </button>
+            )}
 
             {/* Language selector */}
             <Dropdown
@@ -144,8 +167,7 @@ export function AppShell({
                       onClick={() => { setLang(l.code); close(); toast(l.label, 'info'); }}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
                         lang === l.code ? 'bg-indigo-50 text-indigo-700' : 'text-ink-700 hover:bg-ink-100'
-                      }`
-                    }
+                      }`}
                     >
                       <FlagIcon code={l.code} size="sm" />
                       <span className="flex-1">{l.label}</span>
@@ -157,11 +179,12 @@ export function AppShell({
               )}
             </Dropdown>
 
+            {/* User dropdown */}
             <Dropdown
-              width="w-60"
+              width="w-64"
               trigger={
                 <button className="flex items-center gap-2 pl-1.5 pr-1 py-1 rounded-xl hover:bg-ink-100 transition-colors ml-1">
-                  <Avatar initials={view === 'admin' ? 'AR' : 'DR'} size="sm" />
+                  <Avatar initials={user?.fullName.split(' ').map((w) => w[0]).slice(0, 2).join('') ?? 'U'} size="sm" />
                   <ChevronDown size={14} className="text-ink-400 hidden sm:block" />
                 </button>
               }
@@ -169,23 +192,42 @@ export function AppShell({
               {(close) => (
                 <>
                   <div className="px-3 py-2.5">
-                    <p className="text-sm font-semibold text-ink-900">
-                      {view === 'admin' ? 'Akmal Rakhimov' : 'Dilnoza Karimova'}
-                    </p>
-                    <p className="text-xs text-ink-400">
-                      {view === 'admin' ? t('user_platformOwner') : t('user_hotelManager')}
-                    </p>
+                    <p className="text-sm font-semibold text-ink-900">{user?.fullName}</p>
+                    <p className="text-xs text-ink-400">{user ? ROLE_LABELS[user.role][langKey] : ''}</p>
+                    <p className="text-[11px] text-ink-300 mt-0.5">{user?.email}</p>
                   </div>
                   <DropdownDivider />
-                  <DropdownLabel>{t('user_account')}</DropdownLabel>
-                  <DropdownItem icon={<User size={15} />} label={t('user_myProfile')} onClick={() => { close(); toast(t('user_myProfile'), 'info'); }} />
-                  <DropdownItem icon={<Settings size={15} />} label={t('user_accountSettings')} onClick={() => { close(); setSettingsOpen(true); }} />
-                  <DropdownItem icon={<CreditCard size={15} />} label={t('user_billingPlans')} onClick={() => { close(); toast(t('user_billingPlans'), 'info'); }} />
+                  <DropdownLabel>{langKey === 'uz' ? "Rolni almashtirish (demo)" : langKey === 'ru' ? 'Сменить роль (демо)' : 'Switch Role (demo)'}</DropdownLabel>
+                  <div className="px-1 py-1 max-h-48 overflow-y-auto">
+                    {allRoles.map((role) => {
+                      const RoleIcon2 = ROLE_ICONS[role];
+                      return (
+                        <button
+                          key={role}
+                          onClick={() => { login(role); close(); setRoleSwitcherOpen(false); }}
+                          className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+                            user?.role === role ? 'bg-indigo-50 text-indigo-700' : 'text-ink-700 hover:bg-ink-100'
+                          }`}
+                        >
+                          <RoleIcon2 size={15} className={user?.role === role ? 'text-indigo-600' : 'text-ink-400'} />
+                          <span className="flex-1">{ROLE_LABELS[role][langKey]}</span>
+                          {user?.role === role && <Check size={14} className="text-indigo-600" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <DropdownDivider />
-                  <DropdownItem icon={<HelpCircle size={15} />} label={t('user_helpSupport')} onClick={() => { close(); toast(t('user_helpSupport'), 'info'); }} />
-                  <DropdownItem icon={<Sparkles size={15} />} label={t('user_whatsNew')} onClick={() => { close(); toast(t('user_whatsNew'), 'info'); }} />
-                  <DropdownDivider />
-                  <DropdownItem icon={<LogOut size={15} />} label={t('user_signOut')} onClick={() => { close(); toast(t('user_signOut'), 'info'); }} danger />
+                  {user?.role !== 'receptionist' && user?.role !== 'housekeeping' && (
+                    <>
+                      <DropdownItem icon={<User size={15} />} label={t('user_myProfile')} onClick={() => { close(); toast(t('user_myProfile'), 'info'); }} />
+                      <DropdownItem icon={<Settings size={15} />} label={t('user_accountSettings')} onClick={() => { close(); setSettingsOpen(true); }} />
+                      <DropdownItem icon={<CreditCard size={15} />} label={t('user_billingPlans')} onClick={() => { close(); toast(t('user_billingPlans'), 'info'); }} />
+                      <DropdownDivider />
+                      <DropdownItem icon={<HelpCircle size={15} />} label={t('user_helpSupport')} onClick={() => { close(); toast(t('user_helpSupport'), 'info'); }} />
+                      <DropdownDivider />
+                    </>
+                  )}
+                  <DropdownItem icon={<LogOut size={15} />} label={t('user_signOut')} onClick={() => { close(); handleLogout(); }} danger />
                 </>
               )}
             </Dropdown>
@@ -236,29 +278,4 @@ export function AppShell({
   );
 }
 
-function ViewSwitchBtn({
-  active,
-  onClick,
-  icon: Icon,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: LucideIcon;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-        active ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'
-      }`}
-    >
-      <Icon size={15} className={active ? 'text-indigo-600' : ''} />
-      <span className="hidden sm:inline">{label}</span>
-    </button>
-  );
-}
-
-// ---- Logo + nav for admin sidebar (kept for admin sub-nav if needed) ----
 export { X };

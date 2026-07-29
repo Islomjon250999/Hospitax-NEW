@@ -28,13 +28,16 @@ export function ClientPanel({
   children,
   activeTab,
   onTabChange,
+  hideTabs,
 }: {
   property: Property;
-  onPropertyChange: (p: Property) => void;
+  onPropertyChange?: (p: Property) => void;
   children: ReactNode;
   activeTab: ClientTab;
   onTabChange: (t: ClientTab) => void;
+  hideTabs?: ClientTab[];
 }) {
+  const visibleTabs = hideTabs ? TABS.filter((t) => !hideTabs.includes(t.id)) : TABS;
   const toast = useToast();
   const { t } = useLang();
 
@@ -78,7 +81,7 @@ export function ClientPanel({
                   key={p.id}
                   icon={<Building2 size={15} />}
                   label={`${p.name} (${p.city})`}
-                  onClick={() => { close(); onPropertyChange(p); toast(`Switched to ${p.name}`, 'info'); }}
+                  onClick={() => { close(); onPropertyChange?.(p); toast(`Switched to ${p.name}`, 'info'); }}
                 />
               ))}
             </>
@@ -88,7 +91,7 @@ export function ClientPanel({
 
       {/* ---- Sub-module tabs ---- */}
       <div className="flex items-center gap-1 border-b border-ink-200 overflow-x-auto">
-        {TABS.map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon;
           const on = activeTab === tab.id;
           return (

@@ -507,6 +507,12 @@ const uz: Dict = {
   val_allBooked: 'Tanlangan sanalar uchun bo\'sh xonalar yo\'q.',
   gen_error: 'Xatolik yuz berdi. Qaytadan urinib ko\'ring.',
   gen_loading: 'Yuklanmoqda…',
+  // ---- Landing page ----
+  landing_formRequired: 'Mehmonxona nomi, bog\'lanish shaxsi va telefon majburiy',
+  landing_formSuccess: 'So\'rovingiz qabul qilindi! Tez orada bog\'lanamiz.',
+  // ---- CEO panel ----
+  ceo_staffCreated: 'Xodim yaratildi',
+  ceo_staffDeleted: 'Xodim o\'chirildi',
 };
 
 const ru: Dict = {
@@ -967,6 +973,12 @@ const ru: Dict = {
   val_allBooked: 'На выбранные даты нет свободных номеров.',
   gen_error: 'Произошла ошибка. Попробуйте снова.',
   gen_loading: 'Загрузка…',
+  // ---- Landing page ----
+  landing_formRequired: 'Название отеля, контактное лицо и телефон обязательны',
+  landing_formSuccess: 'Ваша заявка принята! Мы скоро свяжемся с вами.',
+  // ---- CEO panel ----
+  ceo_staffCreated: 'Сотрудник создан',
+  ceo_staffDeleted: 'Сотрудник удалён',
 };
 
 const en: Dict = {
@@ -1427,6 +1439,12 @@ const en: Dict = {
   val_allBooked: 'No rooms available for the selected dates.',
   gen_error: 'An error occurred. Please try again.',
   gen_loading: 'Loading…',
+  // ---- Landing page ----
+  landing_formRequired: 'Hotel name, contact person and phone are required',
+  landing_formSuccess: 'Your request has been received! We will contact you soon.',
+  // ---- CEO panel ----
+  ceo_staffCreated: 'Staff member created',
+  ceo_staffDeleted: 'Staff member deleted',
 };
 
 const DICTS: Record<Lang, Dict> = { uz, ru, en };
