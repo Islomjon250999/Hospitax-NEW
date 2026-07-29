@@ -3,6 +3,7 @@ import { X, Phone, Mail, Users, Baby, Calendar, AlertCircle, AlertTriangle } fro
 import type { Room, RoomCategory, Tariff, BookingGuest, Booking } from '../../types';
 import { UZS, todayISO, addDaysISO, nightsBetween, hasDateConflict, exceedsCapacity, exceedsBase } from '../../utils';
 import { useLang } from '../../i18n';
+import { useRoomAvailability } from '../../lib/useAvailability';
 import type { CurrencyLang } from '../../utils';
 
 interface GroupBookingModalProps {
@@ -55,6 +56,8 @@ export function GroupBookingModal({
   const [guestNames, setGuestNames] = useState<BookingGuest[]>([]);
 
   const nights = nightsBetween(checkIn, checkOut);
+  const unavailableIds = useRoomAvailability(checkIn, checkOut);
+  const availableRooms = rooms.filter((r) => !unavailableIds.has(r.id));
 
   const selectedTariff = tariffs.find((tm) => tm.id === tariffId);
   const nightly = selectedTariff?.dailyRate || 0;
@@ -72,7 +75,7 @@ export function GroupBookingModal({
   const capacityExceeded = selectedCategory ? exceedsCapacity(adults, children, maxAdults, maxChildren) : false;
   const capacityWarn = selectedCategory ? exceedsBase(adults, children, selectedCategory.baseAdults, selectedCategory.baseKids) : false;
   const leadName = guestNames[0]?.name?.trim() || '';
-  const canSubmit = !!leadName && !!groupName && selectedRoomIds.length > 0 && !!tariffId && nights > 0 && conflictingRooms.length === 0 && !capacityExceeded;
+  const canSubmit = !!leadName && !!groupName && selectedRoomIds.length > 0 && !!tariffId && nights > 0 && conflictingRooms.length === 0 && !capacityExceeded && selectedRoomIds.every((rid) => availableRooms.some((r) => r.id === rid));
 
   // Sync guest name fields when adult/child counts change
   useEffect(() => {
@@ -305,7 +308,12 @@ export function GroupBookingModal({
               {t('gb_selectRooms')} * ({selectedRoomIds.length})
             </label>
             <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto border border-ink-200 rounded-lg p-3 bg-ink-50">
-              {rooms.map((room) => {
+              {availableRooms.length === 0 ? (
+                <div className="col-span-2 flex items-center gap-2 p-3">
+                  <AlertCircle size={16} className="text-rose-500 shrink-0" />
+                  <p className="text-sm font-medium text-rose-600">{t('val_allBooked')}</p>
+                </div>
+              ) : availableRooms.map((room) => {
                 const cat = categories.find((c) => c.id === room.categoryId);
                 const isSelected = selectedRoomIds.includes(room.id);
                 const hasConflict = isSelected && conflictingRooms.includes(room.id);

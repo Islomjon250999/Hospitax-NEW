@@ -28,6 +28,8 @@ import { useToast } from '../../toast';
 import { useLang } from '../../i18n';
 import { GroupBookingModal } from './GroupBookingModal';
 import { EditBookingModal } from './EditBookingModal';
+import { createBooking, updateBooking, deleteBooking as dbDeleteBooking, updateBookingStatus, updateRoomStatus, type BookingInput } from '../../lib/pmsData';
+import { useRoomAvailability } from '../../lib/useAvailability';
 
 const DAYS = 14;
 
@@ -73,10 +75,10 @@ interface PmsData {
 
 export function Shaxmatka({
   data,
-  onUpdateData,
+  onReload,
 }: {
   data: PmsData;
-  onUpdateData: (d: Partial<PmsData>) => void;
+  onReload: () => void;
 }) {
   const { lang, t } = useLang();
   const [startOffset, setStartOffset] = useState(0);
@@ -168,22 +170,55 @@ export function Shaxmatka({
   const occupiedRooms = new Set(inhouseBookings.map((b) => b.roomId)).size;
   const occupancyRate = data.rooms.length > 0 ? Math.round((occupiedRooms / data.rooms.length) * 100) : 0;
 
-  const addBooking = (b: Omit<Booking, 'id'>) => {
-    const newB = { ...b, id: `b${++bookingCounter}` };
-    onUpdateData({ bookings: [...data.bookings, newB] });
-    toast(`${t('qb_create')}: ${b.guestName}`, 'success');
+  const addBooking = async (b: Omit<Booking, 'id'>) => {
+    const checkInDate = addDaysISO(todayISO(), b.startOffset);
+    const checkOutDate = addDaysISO(checkInDate, b.nights);
+    const input: BookingInput = {
+      guestName: b.guestName,
+      guestCountry: b.guestCountry,
+      roomId: b.roomId,
+      checkInDate,
+      checkOutDate,
+      status: b.status,
+      total: b.total,
+      channel: b.channel,
+      phone: b.phone,
+      tariffId: b.tariffId,
+      paymentStatus: b.paymentStatus,
+      serviceIds: b.serviceIds ?? [],
+      adults: b.adults ?? 1,
+      children: b.children ?? 0,
+      guests: b.guests ?? [],
+    };
+    try {
+      await createBooking(input);
+      await onReload();
+      toast(`${t('qb_create')}: ${b.guestName}`, 'success');
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
-  const updateStatus = (id: string, status: BookingStatus) => {
-    onUpdateData({ bookings: data.bookings.map((b) => (b.id === id ? { ...b, status } : b)) });
-    setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
-    toast(`${t('bd_updateStatus')}: ${t(statusStyle[status].labelKey)}`, 'success');
+  const updateStatus = async (id: string, status: BookingStatus) => {
+    try {
+      await updateBookingStatus(id, status);
+      await onReload();
+      setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
+      toast(`${t('bd_updateStatus')}: ${t(statusStyle[status].labelKey)}`, 'success');
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
-  const deleteBooking = (id: string) => {
-    onUpdateData({ bookings: data.bookings.filter((b) => b.id !== id) });
-    setSelected(null);
-    toast(t('bd_cancel'), 'info');
+  const deleteBooking = async (id: string) => {
+    try {
+      await dbDeleteBooking(id);
+      await onReload();
+      setSelected(null);
+      toast(t('bd_cancel'), 'info');
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
   const isCellOccupied = (roomId: string, dayOffset: number) =>
@@ -544,9 +579,9 @@ export function Shaxmatka({
         tariffs={data.tariffs}
         existingBookings={data.bookings}
         lang={lang}
-        onSubmit={(bookings) => {
-          bookings.forEach((booking) => {
-            addBooking({
+        onSubmit={async (bookings) => {
+          for (const booking of bookings) {
+            await addBooking({
               guestName: booking.guestName,
               guestCountry: 'Uzbekistan',
               startOffset: booking.startOffset,
@@ -562,7 +597,7 @@ export function Shaxmatka({
               children: booking.children,
               guests: booking.guests,
             });
-          });
+          }
           setGroupBooking(false);
           toast(`${bookings.length} ${t('qb_create').toLowerCase()}`, 'success');
         }}
@@ -594,12 +629,33 @@ export function Shaxmatka({
         services={data.services}
         existingBookings={data.bookings}
         lang={lang}
-        onSubmit={(updatedBooking) => {
-          onUpdateData({
-            bookings: data.bookings.map((b) => b.id === updatedBooking.id ? updatedBooking : b),
-          });
-          setEditingBooking(null);
-          toast(t('gen_save'), 'success');
+        onSubmit={async (updatedBooking) => {
+          try {
+            const checkInDate = addDaysISO(todayISO(), updatedBooking.startOffset);
+            const checkOutDate = addDaysISO(checkInDate, updatedBooking.nights);
+            await updateBooking(updatedBooking.id, {
+              guestName: updatedBooking.guestName,
+              guestCountry: updatedBooking.guestCountry,
+              roomId: updatedBooking.roomId,
+              checkInDate,
+              checkOutDate,
+              status: updatedBooking.status,
+              total: updatedBooking.total,
+              channel: updatedBooking.channel,
+              phone: updatedBooking.phone,
+              tariffId: updatedBooking.tariffId,
+              paymentStatus: updatedBooking.paymentStatus,
+              serviceIds: updatedBooking.serviceIds ?? [],
+              adults: updatedBooking.adults ?? 1,
+              children: updatedBooking.children ?? 0,
+              guests: updatedBooking.guests ?? [],
+            });
+            await onReload();
+            setEditingBooking(null);
+            toast(t('gen_save'), 'success');
+          } catch {
+            toast(t('gen_error'), 'error');
+          }
         }}
       />
 
@@ -628,7 +684,7 @@ export function Shaxmatka({
                   key={s}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onUpdateData({ rooms: data.rooms.map((r) => r.id === room.id ? { ...r, status: s } : r) });
+                    updateRoomStatus(room.id, s).then(() => onReload()).catch(() => toast(t('gen_error'), 'error'));
                     setStatusMenuRoomId(null);
                     setStatusMenuAnchor(null);
                   }}
@@ -985,6 +1041,8 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
   const [guestNames, setGuestNames] = useState<BookingGuest[]>([]);
 
   const nights = nightsBetween(checkIn, checkOut);
+  const unavailableIds = useRoomAvailability(checkIn, checkOut);
+  const availableRooms = rooms.filter((r) => !unavailableIds.has(r.id));
 
   const room = rooms.find((r) => r.id === selectedRoomId);
   const cat = room ? categories.find((c) => c.id === room.categoryId) : undefined;
@@ -1033,7 +1091,7 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
   const dateConflict = hasDateConflict(existingBookings, selectedRoomId, startOffset, nights);
   const capacityExceeded = room && cat ? exceedsCapacity(adults, children, maxAdults, maxChildren) : false;
   const capacityWarn = room && cat ? exceedsBase(adults, children, cat.baseAdults, cat.baseKids) : false;
-  const canSubmit = !!guest.trim() && !!selectedRoomId && nights > 0 && !dateConflict && !capacityExceeded;
+  const canSubmit = !!guest.trim() && !!selectedRoomId && nights > 0 && !dateConflict && !capacityExceeded && availableRooms.some((r) => r.id === selectedRoomId);
 
   useImperativeHandle(ref, () => ({ submit, canSubmit }), [guest, selectedRoomId, checkIn, checkOut, nights, dateConflict, capacityExceeded, adults, children, total, channel, phone, tariffId, paymentStatus, selectedServices, guestNames]);
 
@@ -1127,13 +1185,20 @@ const QuickBookingForm = forwardRef<{ submit: () => void }, {
       {/* 4. Room selection */}
       <div>
         <label className="label">{t('bd_room')}</label>
-        <select value={selectedRoomId} onChange={(e) => handleRoomChange(e.target.value)} className="input">
-          <option value="">—</option>
-          {rooms.map((r) => {
-            const rc = categories.find((c) => c.id === r.categoryId);
-            return <option key={r.id} value={r.id}>{r.label} · {rc?.name}</option>;
-          })}
-        </select>
+        {availableRooms.length === 0 ? (
+          <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 flex items-start gap-2.5">
+            <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+            <p className="text-sm font-medium text-rose-700">{t('val_allBooked')}</p>
+          </div>
+        ) : (
+          <select value={selectedRoomId} onChange={(e) => handleRoomChange(e.target.value)} className="input">
+            <option value="">—</option>
+            {availableRooms.map((r) => {
+              const rc = categories.find((c) => c.id === r.categoryId);
+              return <option key={r.id} value={r.id}>{r.label} · {rc?.name}</option>;
+            })}
+          </select>
+        )}
       </div>
       {room ? (
         <>

@@ -17,6 +17,7 @@ import { UZS } from '../../utils';
 import { Modal, EmptyState, Toggle } from '../ui';
 import { useToast } from '../../toast';
 import { useLang } from '../../i18n';
+import { createService, updateService, deleteService as dbDeleteService } from '../../lib/pmsData';
 
 const CALC_TYPES: ServiceCalcType[] = ['Per Night', 'Per Person', 'One-Time'];
 
@@ -59,26 +60,45 @@ export function ExtraServices({ services, onUpdate }: Props) {
   const { lang, t } = useLang();
   const toast = useToast();
 
-  const deleteService = (id: string) => {
+  const deleteService = async (id: string) => {
     const svc = services.find((x) => x.id === id);
-    onUpdate(services.filter((x) => x.id !== id));
-    toast(`${svc?.name} — ${t('gen_delete')}`, 'info');
+    try {
+      await dbDeleteService(id);
+      onUpdate(services.filter((x) => x.id !== id));
+      toast(`${svc?.name} — ${t('gen_delete')}`, 'info');
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
-  const saveService = (s: ExtraService) => {
-    if (services.find((x) => x.id === s.id)) {
-      onUpdate(services.map((x) => (x.id === s.id ? s : x)));
-      toast(`${s.name} — ${t('gen_save')}`, 'success');
-    } else {
-      onUpdate([...services, s]);
-      toast(`${s.name} — ${t('sm_create')}`, 'success');
+  const saveService = async (s: ExtraService) => {
+    try {
+      if (services.find((x) => x.id === s.id)) {
+        await updateService(s);
+        onUpdate(services.map((x) => (x.id === s.id ? s : x)));
+        toast(`${s.name} — ${t('gen_save')}`, 'success');
+      } else {
+        await createService(s);
+        onUpdate([...services, s]);
+        toast(`${s.name} — ${t('sm_create')}`, 'success');
+      }
+    } catch {
+      toast(t('gen_error'), 'error');
     }
     setEditing(null);
     setAdding(false);
   };
 
-  const toggleActive = (id: string) => {
-    onUpdate(services.map((s) => (s.id === id ? { ...s, active: !s.active } : s)));
+  const toggleActive = async (id: string) => {
+    const svc = services.find((s) => s.id === id);
+    if (!svc) return;
+    const updated = { ...svc, active: !svc.active };
+    try {
+      await updateService(updated);
+      onUpdate(services.map((s) => (s.id === id ? updated : s)));
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
   return (

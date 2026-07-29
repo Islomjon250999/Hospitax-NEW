@@ -3,6 +3,7 @@ import { X, Users, Calendar, Baby, AlertCircle, AlertTriangle } from 'lucide-rea
 import type { Booking, Room, RoomCategory, Tariff, ExtraService, BookingStatus, BookingGuest } from '../../types';
 import { UZS, todayISO, addDaysISO, nightsBetween, hasDateConflict, exceedsCapacity, exceedsBase } from '../../utils';
 import { useLang } from '../../i18n';
+import { useRoomAvailability } from '../../lib/useAvailability';
 import type { CurrencyLang } from '../../utils';
 
 interface EditBookingModalProps {
@@ -64,6 +65,8 @@ export function EditBookingModal({
   }, [initialBooking, open]);
 
   const nights = useMemo(() => nightsBetween(checkIn, checkOut), [checkIn, checkOut]);
+  const unavailableIds = useRoomAvailability(checkIn, checkOut, initialBooking?.id);
+  const availableRooms = rooms.filter((r) => !unavailableIds.has(r.id));
 
   // Sync guest name fields when adult/child counts change
   useEffect(() => {
@@ -109,7 +112,7 @@ export function EditBookingModal({
   const dateConflict = hasDateConflict(existingBookings, roomId, editStartOffset, nights, initialBooking?.id);
   const capacityExceeded = selectedCategory ? exceedsCapacity(adults, children, maxAdults, maxChildren) : false;
   const capacityWarn = selectedCategory ? exceedsBase(adults, children, selectedCategory.baseAdults, selectedCategory.baseKids) : false;
-  const canSave = !!guestName.trim() && !!roomId && nights > 0 && !dateConflict && !capacityExceeded;
+  const canSave = !!guestName.trim() && !!roomId && nights > 0 && !dateConflict && !capacityExceeded && availableRooms.some((r) => r.id === roomId);
 
   const handleGuestNameChange = (idx: number, name: string) => {
     setGuestNames((prev) => prev.map((g, i) => (i === idx ? { ...g, name } : g)));
@@ -303,7 +306,7 @@ export function EditBookingModal({
               <label className="block text-sm font-semibold text-ink-700 mb-2">{t('eb_room')} *</label>
               <select value={roomId} onChange={(e) => setRoomId(e.target.value)} className="input w-full">
                 <option value="">{t('eb_selectRoom')}</option>
-                {rooms.map((room) => {
+                {availableRooms.map((room) => {
                   const cat = categories.find((c) => c.id === room.categoryId);
                   return (
                     <option key={room.id} value={room.id}>

@@ -504,6 +504,9 @@ const uz: Dict = {
   gen_rooms: 'xona',
   gen_categories: 'kategoriya',
   gen_tariffs: 'tarif',
+  val_allBooked: 'Tanlangan sanalar uchun bo\'sh xonalar yo\'q.',
+  gen_error: 'Xatolik yuz berdi. Qaytadan urinib ko\'ring.',
+  gen_loading: 'Yuklanmoqda…',
 };
 
 const ru: Dict = {
@@ -961,6 +964,9 @@ const ru: Dict = {
   gen_rooms: 'номеров',
   gen_categories: 'категорий',
   gen_tariffs: 'тарифов',
+  val_allBooked: 'На выбранные даты нет свободных номеров.',
+  gen_error: 'Произошла ошибка. Попробуйте снова.',
+  gen_loading: 'Загрузка…',
 };
 
 const en: Dict = {
@@ -1418,6 +1424,9 @@ const en: Dict = {
   gen_rooms: 'rooms',
   gen_categories: 'categories',
   gen_tariffs: 'rate plans',
+  val_allBooked: 'No rooms available for the selected dates.',
+  gen_error: 'An error occurred. Please try again.',
+  gen_loading: 'Loading…',
 };
 
 const DICTS: Record<Lang, Dict> = { uz, ru, en };

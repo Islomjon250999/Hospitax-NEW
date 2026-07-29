@@ -11,6 +11,7 @@ import { UZS } from '../../utils';
 import { Modal, EmptyState } from '../ui';
 import { useToast } from '../../toast';
 import { useLang } from '../../i18n';
+import { createCategory, updateCategory, deleteCategory as dbDeleteCategory, createRoom, updateRoom, deleteRoom as dbDeleteRoom } from '../../lib/pmsData';
 
 const ROOM_STATUS_STYLE: Record<RoomStatus, { dot: string; chip: string; labelKey: string }> = {
   Clean: { dot: 'bg-emerald-400', chip: 'text-emerald-700 bg-emerald-50', labelKey: 'room_clean' },
@@ -34,64 +35,81 @@ export function RoomTypes({ rooms, categories, onUpdate }: Props) {
   const { t } = useLang();
   const toast = useToast();
 
-  const deleteCategory = (id: string) => {
+  const deleteCategory = async (id: string) => {
     const cat = categories.find((c) => c.id === id);
     const catRooms = rooms.filter((r) => r.categoryId === id);
-    onUpdate({
-      categories: categories.filter((c) => c.id !== id),
-      rooms: rooms.filter((r) => r.categoryId !== id),
-    });
-    toast(`${cat?.name} — ${t('rt_delete')}`, 'info');
+    try {
+      for (const r of catRooms) await dbDeleteRoom(r.id);
+      await dbDeleteCategory(id);
+      onUpdate({
+        categories: categories.filter((c) => c.id !== id),
+        rooms: rooms.filter((r) => r.categoryId !== id),
+      });
+      toast(`${cat?.name} — ${t('rt_delete')}`, 'info');
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
-  const saveCategory = (cat: RoomCategory, newRoomLabels: string[]) => {
-    if (categories.find((c) => c.id === cat.id)) {
-      // edit existing — update category, add any new rooms
-      const existingRoomIds = rooms.filter((r) => r.categoryId === cat.id).map((r) => r.id);
-      const newRooms: Room[] = newRoomLabels.map((label) => ({
-        id: `r${++roomCounter}`,
-        label,
-        categoryId: cat.id,
-        type: cat.name,
-        floor: 1,
-        baseRate: 480000,
-        status: 'Clean' as RoomStatus,
-      }));
-      onUpdate({
-        categories: categories.map((c) => (c.id === cat.id ? { ...cat, roomIds: [...existingRoomIds, ...newRooms.map((r) => r.id)] } : c)),
-        rooms: [...rooms, ...newRooms],
-      });
-      toast(`${cat.name} — ${t('gen_save')}`, 'success');
-    } else {
-      // new category + new rooms
-      const newRooms: Room[] = newRoomLabels.map((label) => ({
-        id: `r${++roomCounter}`,
-        label,
-        categoryId: cat.id,
-        type: cat.name,
-        floor: 1,
-        baseRate: 480000,
-        status: 'Clean' as RoomStatus,
-      }));
-      onUpdate({
-        categories: [...categories, { ...cat, roomIds: newRooms.map((r) => r.id) }],
-        rooms: [...rooms, ...newRooms],
-      });
-      toast(`${cat.name} — ${t('rcm_create')} (${newRooms.length})`, 'success');
+  const saveCategory = async (cat: RoomCategory, newRoomLabels: string[]) => {
+    try {
+      if (categories.find((c) => c.id === cat.id)) {
+        const existingRoomIds = rooms.filter((r) => r.categoryId === cat.id).map((r) => r.id);
+        const newRooms: Room[] = newRoomLabels.map((label) => ({
+          id: `r${++roomCounter}`,
+          label,
+          categoryId: cat.id,
+          type: cat.name,
+          floor: 1,
+          baseRate: 480000,
+          status: 'Clean' as RoomStatus,
+        }));
+        await updateCategory({ ...cat, roomIds: [...existingRoomIds, ...newRooms.map((r) => r.id)] });
+        for (const r of newRooms) await createRoom(r);
+        onUpdate({
+          categories: categories.map((c) => (c.id === cat.id ? { ...cat, roomIds: [...existingRoomIds, ...newRooms.map((r) => r.id)] } : c)),
+          rooms: [...rooms, ...newRooms],
+        });
+        toast(`${cat.name} — ${t('gen_save')}`, 'success');
+      } else {
+        const newRooms: Room[] = newRoomLabels.map((label) => ({
+          id: `r${++roomCounter}`,
+          label,
+          categoryId: cat.id,
+          type: cat.name,
+          floor: 1,
+          baseRate: 480000,
+          status: 'Clean' as RoomStatus,
+        }));
+        const fullCat = { ...cat, roomIds: newRooms.map((r) => r.id) };
+        await createCategory(fullCat);
+        for (const r of newRooms) await createRoom(r);
+        onUpdate({
+          categories: [...categories, fullCat],
+          rooms: [...rooms, ...newRooms],
+        });
+        toast(`${cat.name} — ${t('rcm_create')} (${newRooms.length})`, 'success');
+      }
+    } catch {
+      toast(t('gen_error'), 'error');
     }
     setEditing(null);
     setAdding(false);
   };
 
-  const cycleRoomStatus = (roomId: string) => {
+  const cycleRoomStatus = async (roomId: string) => {
     const order: RoomStatus[] = ['Clean', 'Dirty', 'Inspected', 'Maintenance'];
-    onUpdate({
-      rooms: rooms.map((r) => {
-        if (r.id !== roomId) return r;
-        const idx = order.indexOf(r.status);
-        return { ...r, status: order[(idx + 1) % order.length] };
-      }),
-    });
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room) return;
+    const idx = order.indexOf(room.status);
+    const newStatus = order[(idx + 1) % order.length];
+    const updated = { ...room, status: newStatus };
+    try {
+      await updateRoom(updated);
+      onUpdate({ rooms: rooms.map((r) => (r.id === roomId ? updated : r)) });
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
   return (

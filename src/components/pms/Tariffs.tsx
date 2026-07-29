@@ -12,6 +12,7 @@ import { UZS, UZS_SHORT } from '../../utils';
 import { Modal, EmptyState, Toggle } from '../ui';
 import { useToast } from '../../toast';
 import { useLang } from '../../i18n';
+import { createTariff, updateTariff, deleteTariff as dbDeleteTariff } from '../../lib/pmsData';
 
 const CANCEL_POLICIES: CancellationPolicy[] = ['Flexible', 'Moderate', 'Strict', 'Non-Refundable'];
 const MEAL_PLANS: MealPlan[] = ['None', 'Breakfast', 'Half Board', 'Full Board'];
@@ -51,26 +52,45 @@ export function Tariffs({ tariffs, categories, onUpdate }: Props) {
   const { lang, t } = useLang();
   const toast = useToast();
 
-  const deleteTariff = (id: string) => {
+  const deleteTariff = async (id: string) => {
     const trf = tariffs.find((x) => x.id === id);
-    onUpdate(tariffs.filter((x) => x.id !== id));
-    toast(`${trf?.name} — ${t('gen_delete')}`, 'info');
+    try {
+      await dbDeleteTariff(id);
+      onUpdate(tariffs.filter((x) => x.id !== id));
+      toast(`${trf?.name} — ${t('gen_delete')}`, 'info');
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
-  const saveTariff = (trf: Tariff) => {
-    if (tariffs.find((x) => x.id === trf.id)) {
-      onUpdate(tariffs.map((x) => (x.id === trf.id ? trf : x)));
-      toast(`${trf.name} — ${t('gen_save')}`, 'success');
-    } else {
-      onUpdate([...tariffs, trf]);
-      toast(`${trf.name} — ${t('tfm_create')}`, 'success');
+  const saveTariff = async (trf: Tariff) => {
+    try {
+      if (tariffs.find((x) => x.id === trf.id)) {
+        await updateTariff(trf);
+        onUpdate(tariffs.map((x) => (x.id === trf.id ? trf : x)));
+        toast(`${trf.name} — ${t('gen_save')}`, 'success');
+      } else {
+        await createTariff(trf);
+        onUpdate([...tariffs, trf]);
+        toast(`${trf.name} — ${t('tfm_create')}`, 'success');
+      }
+    } catch {
+      toast(t('gen_error'), 'error');
     }
     setEditing(null);
     setAdding(false);
   };
 
-  const toggleActive = (id: string) => {
-    onUpdate(tariffs.map((x) => (x.id === id ? { ...x, active: !x.active } : x)));
+  const toggleActive = async (id: string) => {
+    const trf = tariffs.find((x) => x.id === id);
+    if (!trf) return;
+    const updated = { ...trf, active: !trf.active };
+    try {
+      await updateTariff(updated);
+      onUpdate(tariffs.map((x) => (x.id === id ? updated : x)));
+    } catch {
+      toast(t('gen_error'), 'error');
+    }
   };
 
   return (
