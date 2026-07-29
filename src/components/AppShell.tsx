@@ -37,7 +37,7 @@ const ROLE_ICONS: Record<UserRole, LucideIcon> = {
 
 const ROLE_ACCENTS: Record<UserRole, string> = {
   ceo: 'from-amber-500 to-orange-500 shadow-amber-200/40',
-  super_admin: 'from-indigo-500 to-violet-500 shadow-indigo-200/40',
+  super_admin: 'from-cyan-500 to-blue-600 shadow-cyan-200/40',
   manager: 'from-emerald-500 to-teal-500 shadow-emerald-200/40',
   receptionist: 'from-sky-500 to-blue-500 shadow-sky-200/40',
   housekeeping: 'from-violet-500 to-purple-500 shadow-violet-200/40',
@@ -93,12 +93,12 @@ export function AppShell({
 
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${user ? ROLE_ACCENTS[user.role] : 'from-indigo-500 to-violet-500'} flex items-center justify-center shadow-lg`}>
+            <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${user ? ROLE_ACCENTS[user.role] : 'from-cyan-500 to-blue-600'} flex items-center justify-center shadow-lg`}>
               <Building2 size={20} className="text-white" />
             </div>
             <div className="leading-tight hidden sm:block">
               <p className="font-extrabold tracking-tight text-ink-900 text-[15px]">
-                Hospita<span className="text-indigo-600">X</span>
+                Hospita<span className="text-cyan-600">X</span>
               </p>
               <p className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Hospitality Cloud</p>
             </div>
@@ -245,7 +245,7 @@ export function AppShell({
         open={notifOpen}
         onClose={() => setNotifOpen(false)}
         title={t('nav_notifications')}
-        icon={<Bell size={18} className="text-indigo-600" />}
+        icon={<Bell size={18} className="text-cyan-600" />}
       >
         <div className="flex items-center justify-between mb-4">
           <span className="text-xs font-semibold text-ink-500">{unread} {t('nav_unread')}</span>

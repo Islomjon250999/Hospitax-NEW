@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Building2,
   CalendarRange,
@@ -16,12 +16,32 @@ import {
   Users,
   ShieldCheck,
   Zap,
+  Hotel,
+  HeartPulse,
+  Palmtree,
+  BedDouble,
+  Search as SearchIcon,
+  Calendar,
+  Clock,
+  Star,
+  type LucideIcon,
 } from 'lucide-react';
 import type { UserRole } from '../types';
 import { useAuth, ROLE_LABELS } from '../lib/auth';
 import { useLang } from '../i18n';
 import { useToast } from '../toast';
 import { createConnectionRequest } from '../lib/hotelData';
+import { properties } from '../mockData';
+
+type PropertyTab = 'Hotel' | 'Sanatorium' | 'Resort' | 'Apartment' | 'Hostel';
+
+const TABS: { id: PropertyTab; icon: LucideIcon; labelKey: { uz: string; ru: string; en: string } }[] = [
+  { id: 'Hotel', icon: Hotel, labelKey: { uz: 'Mehmonxona', ru: 'Отель', en: 'Hotel' } },
+  { id: 'Sanatorium', icon: HeartPulse, labelKey: { uz: 'Sanatoriya', ru: 'Санаторий', en: 'Sanatorium' } },
+  { id: 'Resort', icon: Palmtree, labelKey: { uz: 'Kurort', ru: 'Курорт', en: 'Resort' } },
+  { id: 'Apartment', icon: Building2, labelKey: { uz: 'Apartament', ru: 'Апартаменты', en: 'Apartment' } },
+  { id: 'Hostel', icon: BedDouble, labelKey: { uz: 'Xostel', ru: 'Хостел', en: 'Hostel' } },
+];
 
 const PRODUCTS = [
   {
@@ -38,6 +58,7 @@ const PRODUCTS = [
       en: ['Room chessboard grid', 'Quick & group bookings', 'Payment & rate management', 'Guest history'],
     },
     forWho: { uz: 'Mehmonxona menejerlari va administratorlari uchun', ru: 'Для менеджеров и администраторов отелей', en: 'For hotel managers and receptionists' },
+    status: 'active' as const,
   },
   {
     icon: Radio,
@@ -53,6 +74,7 @@ const PRODUCTS = [
       en: ['9+ OTA channels', 'Auto price sync', 'Real-time availability updates', 'Commission reports'],
     },
     forWho: { uz: "Mehmonxonalar uchun ko'p kanalli savdoni avtomatlashtirish", ru: 'Автоматизация многоканальных продаж для отелей', en: 'Automating multi-channel sales for hotels' },
+    status: 'soon' as const,
   },
   {
     icon: Globe,
@@ -68,10 +90,37 @@ const PRODUCTS = [
       en: ['Widget for hotel website', 'Commission-free payments', 'Mobile-friendly design', 'Real-time availability'],
     },
     forWho: { uz: "Mehmonxonalar uchun to'g'ridan-to'g'ri bron savdosini oshirish", ru: 'Увеличение прямых продаж для отелей', en: 'Increasing direct booking sales for hotels' },
+    status: 'active' as const,
   },
 ];
 
 const CITIES = ['Tashkent', 'Samarkand', 'Bukhara', 'Khiva', 'Tashkent Region', 'Other'];
+
+const PROPERTY_IMAGES: string[] = [
+  'https://images.pexels.com/photos/4557446/pexels-photo-4557446.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+  'https://images.pexels.com/photos/37431910/pexels-photo-37431910.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+  'https://images.pexels.com/photos/7546610/pexels-photo-7546610.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+  'https://images.pexels.com/photos/19227989/pexels-photo-19227989.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+  'https://images.pexels.com/photos/14036253/pexels-photo-14036253.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+  'https://images.pexels.com/photos/15621208/pexels-photo-15621208.jpeg?auto=compress&cs=tinysrgb&h=650&w=940',
+];
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function addDaysISO(iso: string, n: number) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+const PROPERTY_TYPE_MAP: Record<string, PropertyTab> = {
+  'Hotel': 'Hotel',
+  'Boutique Hotel': 'Hotel',
+  'Hostel': 'Hostel',
+  'Resort': 'Resort',
+  'Guesthouse': 'Hotel',
+};
 
 export function LandingPage() {
   const { lang, t } = useLang();
@@ -80,6 +129,9 @@ export function LandingPage() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [form, setForm] = useState({ hotelName: '', contactName: '', phone: '', email: '', city: 'Tashkent', roomCount: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<PropertyTab>('Hotel');
+  const [search, setSearch] = useState({ destination: '', checkIn: todayISO(), checkOut: addDaysISO(todayISO(), 1), guests: '2' });
+  const [searched, setSearched] = useState(false);
 
   const langKey = lang as 'uz' | 'ru' | 'en';
 
@@ -108,6 +160,23 @@ export function LandingPage() {
     }
   };
 
+  const handleSearch = () => {
+    setSearched(true);
+    setTimeout(() => document.getElementById('search-results')?.scrollIntoView({ behavior: 'smooth' }), 100);
+  };
+
+  const filteredProperties = useMemo(() => {
+    return properties.filter((p) => {
+      const tabType = PROPERTY_TYPE_MAP[p.type] ?? 'Hotel';
+      if (tabType !== activeTab) return false;
+      if (search.destination.trim()) {
+        const q = search.destination.toLowerCase();
+        if (!p.name.toLowerCase().includes(q) && !p.city.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [activeTab, search.destination]);
+
   const roles: UserRole[] = ['ceo', 'super_admin', 'manager', 'receptionist', 'housekeeping'];
 
   return (
@@ -116,19 +185,19 @@ export function LandingPage() {
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-ink-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-200/50">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-200/50">
               <Building2 size={20} className="text-white" />
             </div>
             <div className="leading-tight">
               <p className="font-extrabold tracking-tight text-ink-900 text-[15px]">
-                Hospita<span className="text-indigo-600">X</span>
+                Hospita<span className="text-cyan-600">X</span>
               </p>
               <p className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Hospitality Cloud</p>
             </div>
           </div>
           <button
             onClick={() => setLoginOpen(true)}
-            className="btn-primary px-4 py-2 text-sm font-bold"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg shadow-lg shadow-cyan-200/40 hover:from-cyan-600 hover:to-blue-700 transition-all"
           >
             <ShieldCheck size={16} />
             {langKey === 'uz' ? "Shaxsiy kabinetga kirish" : langKey === 'ru' ? 'Войти в личный кабинет' : 'Login / Sign In'}
@@ -136,85 +205,175 @@ export function LandingPage() {
         </div>
       </header>
 
-      {/* ── Hero ── */}
+      {/* ── Hero with booking widget ── */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-violet-50" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold mb-4">
-                <Sparkles size={13} /> HospitaX Hospitality Cloud
-              </span>
-              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-ink-900 leading-[1.1]">
-                {langKey === 'uz' ? "Mehmonxona boshqaruvi uchun bitta platforma" : langKey === 'ru' ? 'Единая платформа для управления отелем' : 'One platform for hotel management'}
-              </h1>
-              <p className="mt-5 text-lg text-ink-500 leading-relaxed max-w-lg">
-                {langKey === 'uz'
-                  ? "PMS, Channel Manager va Booking Engine — mehmonxona biznesingizni raqamlashtirish uchun barcha vositalar bitta tizimda."
-                  : langKey === 'ru'
-                  ? 'PMS, Channel Manager и Booking Engine — все инструменты для цифровизации вашего отеля в одной системе.'
-                  : 'PMS, Channel Manager and Booking Engine — all tools to digitize your hotel business in one system.'}
-              </p>
-              <div className="mt-7 flex flex-wrap gap-3">
-                <button
-                  onClick={() => document.getElementById('apply')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="btn-primary px-6 py-3 text-sm font-bold"
-                >
-                  <Send size={16} />
-                  {langKey === 'uz' ? "Bepul ulanish so'rovi" : langKey === 'ru' ? 'Бесплатная заявка' : 'Request Free Connection'}
-                </button>
-                <a
-                  href="https://t.me/hospitalx_uz"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary px-6 py-3 text-sm font-bold"
-                >
-                  <MessageCircle size={16} />
-                  Telegram
-                </a>
-              </div>
-              <div className="mt-8 flex items-center gap-6 text-sm">
-                <div className="flex items-center gap-2 text-ink-600">
-                  <Check size={16} className="text-emerald-500" />
-                  {langKey === 'uz' ? '12+ mehmonxona' : langKey === 'ru' ? '12+ отелей' : '12+ hotels'}
-                </div>
-                <div className="flex items-center gap-2 text-ink-600">
-                  <Check size={16} className="text-emerald-500" />
-                  {langKey === 'uz' ? '9+ OTA kanallar' : langKey === 'ru' ? '9+ OTA-каналов' : '9+ OTA channels'}
-                </div>
-                <div className="flex items-center gap-2 text-ink-600">
-                  <Check size={16} className="text-emerald-500" />
-                  24/7 {langKey === 'uz' ? 'qo‘llab-quvvatlash' : langKey === 'ru' ? 'поддержка' : 'support'}
-                </div>
-              </div>
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-50 via-white to-blue-50" />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-8">
+          <div className="text-center mb-8">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-bold mb-4">
+              <Sparkles size={13} /> HospitaX Hospitality Cloud
+            </span>
+            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-ink-900 leading-[1.1]">
+              {langKey === 'uz' ? "Mehmonxona va dam olish maskanlari qidiruv tizimi" : langKey === 'ru' ? 'Поиск отелей и мест отдыха' : 'Find Hotels & Stays'}
+            </h1>
+            <p className="mt-4 text-lg text-ink-500 leading-relaxed max-w-xl mx-auto">
+              {langKey === 'uz'
+                ? "Mehmonxona, sanatoriya, kurort, apartament va xostellarni toping va to'g'ridan-to'g'ri bron qiling."
+                : langKey === 'ru'
+                ? 'Находите отели, санатории, курорты, апартаменты и хостелы. Бронируйте напрямую.'
+                : 'Find hotels, sanatoriums, resorts, apartments and hostels. Book directly.'}
+            </p>
+          </div>
+
+          {/* ── Booking Search Widget ── */}
+          <div className="bg-white rounded-2xl shadow-xl shadow-cyan-200/30 border border-cyan-100/50 overflow-hidden max-w-4xl mx-auto">
+            {/* Top Row: Tabs */}
+            <div className="flex items-stretch gap-0 border-b border-ink-100 overflow-x-auto grid-no-scrollbar">
+              {TABS.map((tab) => {
+                const Icon = tab.icon;
+                const on = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => { setActiveTab(tab.id); setSearched(false); }}
+                    className={`flex items-center gap-2 px-4 sm:px-5 py-3 text-sm font-bold whitespace-nowrap transition-all border-b-[3px] rounded-t-lg ${
+                      on
+                        ? 'bg-gradient-to-b from-cyan-50 to-white text-cyan-700 border-cyan-500'
+                        : 'text-ink-500 border-transparent hover:text-ink-700 hover:bg-ink-50/50'
+                    }`}
+                  >
+                    <Icon size={18} className={on ? 'text-cyan-600' : 'text-ink-400'} />
+                    {tab.labelKey[langKey]}
+                  </button>
+                );
+              })}
             </div>
-            <div className="relative">
-              <img
-                src="https://images.pexels.com/photos/14036253/pexels-photo-14036253.jpeg?auto=compress&cs=tinysrgb&h=650&w=940"
-                alt="Luxury hotel lobby"
-                className="rounded-2xl shadow-2xl shadow-indigo-200/40 w-full h-[360px] object-cover"
-              />
-              <div className="absolute -bottom-5 -left-5 bg-white rounded-xl shadow-lg p-4 border border-ink-100 hidden sm:block">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center">
-                    <TrendingUp size={20} className="text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-extrabold text-ink-900">+38%</p>
-                    <p className="text-[11px] text-ink-400 font-medium">{langKey === 'uz' ? "To'g'ridan-to'g'ri bronlar o'sishi" : langKey === 'ru' ? 'Рост прямых броней' : 'Direct booking growth'}</p>
-                  </div>
+
+            {/* Bottom Row: Inputs + Search */}
+            <div className="p-4 flex flex-col sm:flex-row items-stretch gap-3">
+              <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
+                    <MapPin size={11} /> {langKey === 'uz' ? "Manzil" : langKey === 'ru' ? 'Куда' : 'Destination'}
+                  </label>
+                  <input
+                    value={search.destination}
+                    onChange={(e) => setSearch({ ...search, destination: e.target.value })}
+                    className="w-full mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                    placeholder={langKey === 'uz' ? "Shahar yoki mehmonxona" : langKey === 'ru' ? 'Город или отель' : 'City or hotel'}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
+                    <Calendar size={11} /> {langKey === 'uz' ? "Kirish" : langKey === 'ru' ? 'Заезд' : 'Check-in'}
+                  </label>
+                  <input
+                    type="date"
+                    value={search.checkIn}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setSearch({ ...search, checkIn: v, checkOut: v >= search.checkOut ? addDaysISO(v, 1) : search.checkOut });
+                    }}
+                    className="w-full mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
+                    <Calendar size={11} /> {langKey === 'uz' ? "Chiqish" : langKey === 'ru' ? 'Выезд' : 'Check-out'}
+                  </label>
+                  <input
+                    type="date"
+                    value={search.checkOut}
+                    min={addDaysISO(search.checkIn, 1)}
+                    onChange={(e) => { if (e.target.value > search.checkIn) setSearch({ ...search, checkOut: e.target.value }); }}
+                    className="w-full mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
+                    <Users size={11} /> {langKey === 'uz' ? "Mehmonlar" : langKey === 'ru' ? 'Гости' : 'Guests'}
+                  </label>
+                  <select
+                    value={search.guests}
+                    onChange={(e) => setSearch({ ...search, guests: e.target.value })}
+                    className="w-full mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all bg-white"
+                  >
+                    {['1', '2', '3', '4', '5', '6+'].map((g) => <option key={g} value={g}>{g} {langKey === 'uz' ? "mehmon" : langKey === 'ru' ? 'гостя' : 'guests'}</option>)}
+                  </select>
                 </div>
               </div>
+              <button
+                onClick={handleSearch}
+                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-extrabold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl shadow-lg shadow-cyan-300/40 hover:from-cyan-600 hover:to-blue-700 hover:shadow-xl transition-all sm:self-end"
+                style={{ minHeight: '44px' }}
+              >
+                <SearchIcon size={18} />
+                {langKey === 'uz' ? "Qidirish" : langKey === 'ru' ? 'Искать' : 'Search'}
+              </button>
             </div>
           </div>
         </div>
       </section>
 
+      {/* ── Search Results ── */}
+      {searched && (
+        <section id="search-results" className="max-w-6xl mx-auto px-4 sm:px-6 py-10 animate-fade-in">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-extrabold tracking-tight text-ink-900">
+              {filteredProperties.length} {langKey === 'uz' ? "natija" : langKey === 'ru' ? 'результатов' : 'results'}
+              <span className="text-ink-400 font-medium text-base ml-2">— {TABS.find((tb) => tb.id === activeTab)?.labelKey[langKey]}</span>
+            </h2>
+          </div>
+          {filteredProperties.length === 0 ? (
+            <div className="card p-12 text-center border border-ink-100">
+              <p className="text-sm text-ink-400">{langKey === 'uz' ? "Bu turdagi obyektlar topilmadi" : langKey === 'ru' ? 'Объекты этого типа не найдены' : 'No properties of this type found'}</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredProperties.map((p, i) => (
+                <div key={p.id} className="card overflow-hidden border border-ink-100 hover:shadow-lg transition-shadow group">
+                  <div className="relative h-44 overflow-hidden">
+                    <img
+                      src={PROPERTY_IMAGES[i % PROPERTY_IMAGES.length]}
+                      alt={p.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute top-3 left-3">
+                      <span className="chip text-xs font-bold bg-white/90 text-cyan-700 backdrop-blur-sm">{p.type}</span>
+                    </div>
+                    <div className="absolute top-3 right-3">
+                      <span className="chip text-xs font-bold bg-white/90 text-amber-600 backdrop-blur-sm">
+                        <Star size={11} className="fill-amber-400 text-amber-400" /> 4.{5 + (i % 3)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <p className="font-bold text-ink-900 truncate">{p.name}</p>
+                    <p className="text-xs text-ink-400 mt-0.5 flex items-center gap-1">
+                      <MapPin size={12} /> {p.city}
+                    </p>
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="flex items-center gap-1.5 text-xs text-ink-500">
+                        <BedDouble size={14} className="text-ink-400" /> {p.rooms} {langKey === 'uz' ? "xona" : langKey === 'ru' ? 'ном.' : 'rooms'}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-ink-400">{langKey === 'uz' ? "dan" : langKey === 'ru' ? 'от' : 'from'}</p>
+                        <p className="text-lg font-extrabold text-cyan-600">{((p.mrr / Math.max(p.rooms, 1)) * 12750).toLocaleString('en-US', { maximumFractionDigits: 0 })} UZS</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── Products ── */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-extrabold tracking-tight text-ink-900">
-            {langKey === 'uz' ? '3 ta asosiy mahsulot' : langKey === 'ru' ? '3 основных продукта' : '3 Core Products'}
+            {langKey === 'uz' ? "Bizning mahsulotlar" : langKey === 'ru' ? 'Наши продукты' : 'Our Products'}
           </h2>
           <p className="mt-3 text-ink-500 max-w-xl mx-auto">
             {langKey === 'uz' ? "Mehmonxona biznesingizning har bir bosqichi uchun professional vositalar" : langKey === 'ru' ? 'Профессиональные инструменты для каждого этапа вашего отельного бизнеса' : 'Professional tools for every stage of your hotel business'}
@@ -223,9 +382,16 @@ export function LandingPage() {
         <div className="grid md:grid-cols-3 gap-6">
           {PRODUCTS.map((p) => {
             const Icon = p.icon;
+            const isSoon = p.status === 'soon';
             return (
-              <div key={p.title.en} className="card p-6 hover:shadow-lg transition-shadow border border-ink-100">
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center shadow-lg shadow-indigo-200/40 mb-5">
+              <div key={p.title.en} className={`card p-6 border transition-all relative ${isSoon ? 'border-amber-200 bg-amber-50/30' : 'border-ink-100 hover:shadow-lg'}`}>
+                {isSoon && (
+                  <div className="absolute -top-2.5 right-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-amber-900 text-[11px] font-extrabold shadow-md">
+                    <Clock size={11} />
+                    {langKey === 'uz' ? "Tez kunda" : langKey === 'ru' ? 'Скоро' : 'Soon'}
+                  </div>
+                )}
+                <div className={`h-12 w-12 rounded-xl text-white flex items-center justify-center shadow-lg mb-5 ${isSoon ? 'bg-gradient-to-br from-amber-400 to-orange-400 shadow-amber-200/40' : 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-cyan-200/40'}`}>
                   <Icon size={24} />
                 </div>
                 <h3 className="text-lg font-bold tracking-tight text-ink-900 mb-2">{p.title[langKey]}</h3>
@@ -233,14 +399,20 @@ export function LandingPage() {
                 <ul className="space-y-2 mb-4">
                   {p.features[langKey].map((f) => (
                     <li key={f} className="flex items-center gap-2 text-sm text-ink-700">
-                      <Check size={15} className="text-emerald-500 shrink-0" /> {f}
+                      <Check size={15} className={isSoon ? 'text-amber-400' : 'text-emerald-500'} shrink-0 /> {f}
                     </li>
                   ))}
                 </ul>
                 <div className="pt-4 border-t border-ink-100">
-                  <p className="text-xs font-semibold text-indigo-600 flex items-center gap-1.5">
-                    <Users size={13} /> {p.forWho[langKey]}
-                  </p>
+                  {isSoon ? (
+                    <p className="text-xs font-bold text-amber-600 flex items-center gap-1.5">
+                      <Clock size={13} /> {langKey === 'uz' ? "Ishlab chiqilmoqda" : langKey === 'ru' ? 'В разработке' : 'Under Development'}
+                    </p>
+                  ) : (
+                    <p className="text-xs font-semibold text-cyan-600 flex items-center gap-1.5">
+                      <Users size={13} /> {p.forWho[langKey]}
+                    </p>
+                  )}
                 </div>
               </div>
             );
@@ -249,14 +421,14 @@ export function LandingPage() {
       </section>
 
       {/* ── Stats ── */}
-      <section className="bg-gradient-to-r from-indigo-600 to-violet-600 py-12">
+      <section className="bg-gradient-to-r from-cyan-600 to-blue-700 py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-white">
             {[
-              { icon: Building2, value: '12+', label: langKey === 'uz' ? 'Mehmonxona' : langKey === 'ru' ? 'Отелей' : 'Hotels' },
+              { icon: Building2, value: '12+', label: langKey === 'uz' ? 'Mehmonxona' : langKey === 'ru' ? 'Объектов' : 'Properties' },
               { icon: CalendarRange, value: '800+', label: langKey === 'uz' ? 'Xonalar' : langKey === 'ru' ? 'Номеров' : 'Rooms' },
-              { icon: Radio, value: '9+', label: langKey === 'uz' ? 'Kanallar' : langKey === 'ru' ? 'Каналов' : 'Channels' },
               { icon: Zap, value: '99.9%', label: langKey === 'uz' ? 'Ishlash vaqti' : langKey === 'ru' ? 'Аптайм' : 'Uptime' },
+              { icon: TrendingUp, value: '+38%', label: langKey === 'uz' ? "To'g'ridan-to'g'ri bron o'sishi" : langKey === 'ru' ? 'Рост прямых броней' : 'Direct booking growth' },
             ].map((s) => {
               const Icon = s.icon;
               return (
@@ -317,7 +489,7 @@ export function LandingPage() {
           <button
             onClick={submitForm}
             disabled={submitting}
-            className="btn-primary w-full mt-5 py-3 text-sm font-bold disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 w-full mt-5 py-3 text-sm font-bold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg shadow-lg shadow-cyan-200/40 hover:from-cyan-600 hover:to-blue-700 disabled:opacity-60 transition-all"
           >
             <Send size={16} /> {submitting ? '...' : (langKey === 'uz' ? "So'rov yuborish" : langKey === 'ru' ? 'Отправить заявку' : 'Submit Request')}
           </button>
@@ -346,7 +518,7 @@ export function LandingPage() {
               <p className="text-xs text-ink-400 mt-1">+998 90 111 22 33</p>
             </a>
             <a href="mailto:info@hospitalx.uz" className="card p-5 text-center hover:shadow-lg transition-shadow border border-ink-100 group">
-              <div className="h-11 w-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+              <div className="h-11 w-11 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
                 <Mail size={22} />
               </div>
               <p className="text-sm font-bold text-ink-900">Email</p>
@@ -382,7 +554,7 @@ export function LandingPage() {
               <button onClick={() => setLoginOpen(false)} className="btn-ghost h-8 w-8 !p-0 rounded-lg">✕</button>
             </div>
             <p className="text-sm text-ink-500 mb-4">
-              {langKey === 'uz' ? "Rollaringizni tanlang (demo):" : langKey === 'ru' ? 'Выберите роль (демо):' : 'Select your role (demo):'}
+              {langKey === 'uz' ? "Rolingizni tanlang (demo):" : langKey === 'ru' ? 'Выберите роль (демо):' : 'Select your role (demo):'}
             </p>
             <div className="space-y-2">
               {roles.map((role) => {
@@ -391,16 +563,16 @@ export function LandingPage() {
                   <button
                     key={role}
                     onClick={() => { login(role); setLoginOpen(false); }}
-                    className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-ink-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-all text-left group"
+                    className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-ink-100 hover:border-cyan-200 hover:bg-cyan-50/40 transition-all text-left group"
                   >
-                    <div className="h-9 w-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                    <div className="h-9 w-9 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center group-hover:bg-cyan-100 transition-colors">
                       <ShieldCheck size={18} />
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-bold text-ink-900">{labels[langKey]}</p>
                       <p className="text-xs text-ink-400">{labels.en}</p>
                     </div>
-                    <ArrowRight size={16} className="text-ink-300 group-hover:text-indigo-500 transition-colors" />
+                    <ArrowRight size={16} className="text-ink-300 group-hover:text-cyan-500 transition-colors" />
                   </button>
                 );
               })}

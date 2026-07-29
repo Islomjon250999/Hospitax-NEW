@@ -20,6 +20,7 @@ import {
   Eye,
   AlertCircle,
   AlertTriangle,
+  Inbox,
 } from 'lucide-react';
 import type { Booking, BookingGuest, BookingStatus, Room, RoomCategory, Tariff, ExtraService, RoomStatus } from '../../types';
 import { UZS, UZS_SHORT, formatDate, pct, todayISO, addDaysISO, nightsBetween, prettyDate, hasDateConflict, exceedsCapacity, exceedsBase, type CurrencyLang } from '../../utils';
@@ -124,7 +125,7 @@ export function Shaxmatka({
   const todayIndex = startOffset <= 0 ? -startOffset : -1;
 
   const visibleRooms = useMemo(() => {
-    let r = data.rooms;
+    let r = data.rooms.filter((room) => room.id !== 'unassigned');
     if (filterCategory !== 'all') r = r.filter((room) => room.categoryId === filterCategory);
     return r;
   }, [data.rooms, filterCategory]);
@@ -155,6 +156,38 @@ export function Shaxmatka({
       .filter((c) => map.has(c.id))
       .map((c) => ({ category: c, rooms: map.get(c.id)! }));
   }, [visibleRooms, data.categories]);
+
+  // Unassigned bookings grouped by category (via tariff → categoryId)
+  const unassignedByCategory = useMemo(() => {
+    const map = new Map<string, Booking[]>();
+    for (const b of data.bookings) {
+      if (b.roomId !== 'unassigned') continue;
+      const tariff = data.tariffs.find((tm) => tm.id === b.tariffId);
+      const catId = tariff?.categoryId;
+      if (!catId) continue;
+      if (filterCategory !== 'all' && catId !== filterCategory) continue;
+      if (b.startOffset + b.nights <= startOffset || b.startOffset >= startOffset + DAYS) continue;
+      const arr = map.get(catId) ?? [];
+      arr.push(b);
+      map.set(catId, arr);
+    }
+    return map;
+  }, [data.bookings, data.tariffs, filterCategory, startOffset]);
+
+  // Available rooms count per day (across all visible rooms)
+  const availablePerDay = useMemo(() => {
+    return days.map((_, i) => {
+      const dayOffset = startOffset + i;
+      const occupied = new Set<string>();
+      for (const b of data.bookings) {
+        if (b.roomId === 'unassigned') continue;
+        if (b.startOffset <= dayOffset && dayOffset < b.startOffset + b.nights) {
+          occupied.add(b.roomId);
+        }
+      }
+      return visibleRooms.length - occupied.size;
+    });
+  }, [days, startOffset, data.bookings, visibleRooms]);
 
   const inhouseBookings = data.bookings.filter(
     (b) => b.status === 'Checked-in' && b.startOffset <= 0 && b.startOffset + b.nights > 0,
@@ -383,8 +416,23 @@ export function Shaxmatka({
               ))}
             </div>
 
+            {/* Available rooms summary row */}
+            <div className="grid bg-emerald-50/40 border-b border-emerald-100" style={{ gridTemplateColumns: `240px repeat(${DAYS}, 1fr)` }}>
+              <div className="px-4 py-2 sticky left-0 z-10 bg-emerald-50/40 flex items-center gap-2 border-r border-ink-100">
+                <DoorOpen size={13} className="text-emerald-600" />
+                <span className="text-xs font-bold text-emerald-700">{t('shax_available')}</span>
+              </div>
+              {availablePerDay.map((count, i) => (
+                <div key={i} className={`px-1 py-2 text-center border-r border-emerald-50 ${i === todayIndex ? 'bg-indigo-50/30' : ''}`}>
+                  <span className={`text-sm font-bold tabular ${count > 0 ? 'text-emerald-600' : 'text-rose-400'}`}>{count}</span>
+                </div>
+              ))}
+            </div>
+
             {/* grouped room rows */}
-            {groupedRooms.map(({ category, rooms: catRooms }) => (
+            {groupedRooms.map(({ category, rooms: catRooms }) => {
+              const unassigned = unassignedByCategory.get(category.id) ?? [];
+              return (
               <div key={category.id}>
                 <div className="grid bg-ink-50/60 border-y border-ink-100" style={{ gridTemplateColumns: `240px repeat(${DAYS}, 1fr)` }}>
                   <div className="px-4 py-2 sticky left-0 z-10 bg-ink-50/60 flex items-center gap-2 border-r border-ink-100">
@@ -394,6 +442,42 @@ export function Shaxmatka({
                   </div>
                   <div style={{ gridColumn: '2 / -1' }} />
                 </div>
+
+                {/* Unassigned bookings row (from public website) */}
+                {unassigned.length > 0 && (
+                  <div className="relative grid border-b border-amber-100 bg-amber-50/30" style={{ gridTemplateColumns: `240px repeat(${DAYS}, 1fr)`, height: '40px' }}>
+                    <div className="sticky left-0 z-10 bg-amber-50/30 px-3 border-r border-ink-100 flex items-center gap-2">
+                      <Inbox size={14} className="text-amber-500 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-amber-700 block leading-tight">{t('shax_unassigned')}</span>
+                        <span className="text-[9px] text-amber-500">{unassigned.length} {t('shax_fromWebsite')}</span>
+                      </div>
+                    </div>
+                    <div className="relative w-full" style={{ gridColumn: '2 / -1', display: 'grid', gridTemplateColumns: `repeat(${DAYS}, 1fr)`, gridTemplateRows: '100%', overflow: 'hidden' }}>
+                      {unassigned.map((b) => {
+                        const visStart = startOffset;
+                        const visEnd = startOffset + DAYS;
+                        const bookStart = b.startOffset;
+                        const bookEnd = b.startOffset + b.nights;
+                        if (bookEnd <= visStart || bookStart >= visEnd) return null;
+                        const displayStart = Math.max(bookStart, visStart);
+                        const displayEnd = Math.min(bookEnd, visEnd);
+                        const colStart = displayStart - visStart + 1;
+                        const span = displayEnd - displayStart;
+                        return (
+                          <div key={b.id} className="relative h-full" style={{ gridColumn: `${colStart} / span ${span}`, gridRow: 1 }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setEditingBooking(b); }}
+                              className="absolute inset-x-1 top-1/2 -translate-y-1/2 h-7 flex items-center px-3 bg-gradient-to-r from-amber-400 to-orange-400 text-xs text-white font-medium rounded-lg shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ring-amber-300 cursor-pointer"
+                            >
+                              <span className="truncate">{b.guestName}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {catRooms.map((room) => {
                   const roomBookings = visibleBookings.filter((b) => b.roomId === room.id);
@@ -517,7 +601,8 @@ export function Shaxmatka({
                   );
                 })}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
