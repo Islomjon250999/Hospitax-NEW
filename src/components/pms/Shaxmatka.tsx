@@ -89,7 +89,6 @@ export function Shaxmatka({
   const [hoveredTip, setHoveredTip] = useState<{
     booking: Booking;
     rect: DOMRect;
-    showAbove: boolean;
     tariff?: Tariff;
   } | null>(null);
   const [showInhouse, setShowInhouse] = useState(false);
@@ -463,7 +462,7 @@ export function Shaxmatka({
                                   onMouseEnter={(e) => {
                                     if (statusMenuRoomId) return;
                                     const rect = e.currentTarget.getBoundingClientRect();
-                                    setHoveredTip({ booking: b, rect, showAbove: lane >= count / 2, tariff });
+                                    setHoveredTip({ booking: b, rect, tariff });
                                   }}
                                   onMouseLeave={() => setHoveredTip(null)}
                                   className={`w-full h-full flex items-center px-3 py-1.5 ${st.bar} text-xs text-white font-medium rounded-lg shadow-sm overflow-hidden whitespace-nowrap hover:brightness-110 hover:shadow-md transition-all ring-1 ${st.ring} cursor-pointer`}
@@ -654,14 +653,22 @@ export function Shaxmatka({
         const checkInDate = addDaysISO(todayISO(), b.startOffset);
         const checkOutDate = addDaysISO(checkInDate, b.nights);
         const tooltipW = 268;
-        const left = Math.max(8, Math.min(hoveredTip.rect.left, window.innerWidth - tooltipW - 8));
+        const tooltipHEst = 320;
+        const tipMargin = 8;
+        const left = Math.max(tipMargin, Math.min(hoveredTip.rect.left, window.innerWidth - tooltipW - tipMargin));
+        const spaceAbove = hoveredTip.rect.top;
+        const spaceBelow = window.innerHeight - hoveredTip.rect.bottom;
+        const showAbove = spaceAbove >= tooltipHEst + tipMargin || spaceAbove >= spaceBelow;
+        const top = showAbove
+          ? `${Math.max(tipMargin + tooltipHEst, hoveredTip.rect.top - tipMargin)}px`
+          : `${Math.min(window.innerHeight - tooltipHEst - tipMargin, hoveredTip.rect.bottom + tipMargin)}px`;
         return (
           <div
             className="fixed z-[65] w-[268px] card p-3.5 shadow-float animate-scale-in text-left pointer-events-none"
             style={{
               left: `${left}px`,
-              top: hoveredTip.showAbove ? `${hoveredTip.rect.top - 6}px` : `${hoveredTip.rect.bottom + 6}px`,
-              transform: hoveredTip.showAbove ? 'translateY(-100%)' : 'none',
+              top,
+              transform: showAbove ? 'translateY(-100%)' : 'none',
             }}
           >
             <div className="flex items-center justify-between mb-2">
