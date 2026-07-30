@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Building2,
   CalendarRange,
@@ -24,6 +24,9 @@ import {
   Calendar,
   Clock,
   Star,
+  ChevronLeft,
+  ChevronRight,
+  MapPinned,
   type LucideIcon,
 } from 'lucide-react';
 import type { UserRole } from '../types';
@@ -122,6 +125,148 @@ const PROPERTY_TYPE_MAP: Record<string, PropertyTab> = {
   'Guesthouse': 'Hotel',
 };
 
+const UZBEKISTAN_REGIONS = [
+  "Toshkent shahri",
+  "Toshkent viloyati",
+  "Samarqand viloyati",
+  "Buxoro viloyati",
+  "Xorazm viloyati",
+  "Farg'ona viloyati",
+  "Namangan viloyati",
+  "Andijon viloyati",
+  "Qashqadaryo viloyati",
+  "Surxondaryo viloyati",
+  "Jizzax viloyati",
+  "Sirdaryo viloyati",
+  "Navoiy viloyati",
+  "Qoraqalpog'iston Respublikasi",
+];
+
+const MONTH_NAMES: Record<'uz' | 'ru' | 'en', string[]> = {
+  uz: ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'],
+  ru: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+};
+
+const WEEKDAY_SHORT: Record<'uz' | 'ru' | 'en', string[]> = {
+  uz: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'],
+  ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+  en: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+};
+
+function parseISO(iso: string): Date {
+  return new Date(iso + 'T00:00:00');
+}
+function toISO(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+function isBefore(a: Date, b: Date): boolean {
+  return toISO(a) < toISO(b);
+}
+
+function MiniCalendar({
+  value,
+  onPick,
+  minDate,
+  maxDate,
+  lang,
+  onClose,
+}: {
+  value: string;
+  onPick: (iso: string) => void;
+  minDate: string;
+  maxDate?: string;
+  lang: 'uz' | 'ru' | 'en';
+  onClose: () => void;
+}) {
+  const [view, setView] = useState(() => {
+    const d = parseISO(value);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const minD = parseISO(minDate);
+  const maxD = maxDate ? parseISO(maxDate) : null;
+
+  const year = view.getFullYear();
+  const month = view.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = (firstDay.getDay() + 6) % 7; // Monday-first
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+
+  const isDisabled = (d: Date): boolean => {
+    if (isBefore(d, today)) return true;
+    if (isBefore(d, minD)) return true;
+    if (maxD && isBefore(maxD, d)) return true;
+    return false;
+  };
+
+  const selectedDate = parseISO(value);
+
+  const pick = (d: Date) => {
+    onPick(toISO(d));
+    onClose();
+  };
+
+  return (
+    <div className="absolute z-50 mt-2 bg-white rounded-xl shadow-2xl border border-ink-100 p-3 w-[280px] animate-fade-in">
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={() => setView(new Date(year, month - 1, 1))}
+          className="h-7 w-7 rounded-lg hover:bg-ink-100 flex items-center justify-center text-ink-500"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="text-sm font-bold text-ink-900">{MONTH_NAMES[lang][month]} {year}</span>
+        <button
+          onClick={() => setView(new Date(year, month + 1, 1))}
+          className="h-7 w-7 rounded-lg hover:bg-ink-100 flex items-center justify-center text-ink-500"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {WEEKDAY_SHORT[lang].map((w) => (
+          <div key={w} className="text-center text-[10px] font-bold text-ink-400 py-1">{w}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const disabled = isDisabled(d);
+          const selected = isSameDay(d, selectedDate);
+          const isToday = isSameDay(d, today);
+          return (
+            <button
+              key={i}
+              disabled={disabled}
+              onClick={() => pick(d)}
+              className={`h-8 w-8 rounded-lg text-xs font-semibold transition-all relative ${
+                selected
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md'
+                  : disabled
+                  ? 'text-ink-300 cursor-not-allowed'
+                  : 'text-ink-700 hover:bg-cyan-50 hover:text-cyan-700'
+              }`}
+            >
+              {d.getDate()}
+              {isToday && !selected && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-cyan-500" />}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function LandingPage() {
   const { lang, t } = useLang();
   const { login } = useAuth();
@@ -132,6 +277,48 @@ export function LandingPage() {
   const [activeTab, setActiveTab] = useState<PropertyTab>('Hotel');
   const [search, setSearch] = useState({ destination: '', checkIn: todayISO(), checkOut: addDaysISO(todayISO(), 1), guests: '2' });
   const [searched, setSearched] = useState(false);
+  const [destOpen, setDestOpen] = useState(false);
+  const [destQuery, setDestQuery] = useState('');
+  const [calOpen, setCalOpen] = useState<null | 'checkIn' | 'checkOut'>(null);
+  const destRef = useRef<HTMLDivElement>(null);
+  const calRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (destRef.current && !destRef.current.contains(e.target as Node)) setDestOpen(false);
+      if (calRef.current && !calRef.current.contains(e.target as Node)) setCalOpen(null);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filteredRegions = useMemo(() => {
+    const q = destQuery.trim().toLowerCase();
+    if (!q) return UZBEKISTAN_REGIONS;
+    return UZBEKISTAN_REGIONS.filter((r) => r.toLowerCase().includes(q));
+  }, [destQuery]);
+
+  const selectRegion = (region: string) => {
+    setSearch({ ...search, destination: region });
+    setDestOpen(false);
+    setDestQuery('');
+  };
+
+  const setCheckInDate = (iso: string) => {
+    const next = addDaysISO(iso, 1);
+    setSearch({
+      ...search,
+      checkIn: iso,
+      checkOut: iso >= search.checkOut ? next : search.checkOut,
+    });
+  };
+  const setCheckOutDate = (iso: string) => {
+    if (iso <= search.checkIn) {
+      setSearch({ ...search, checkIn: iso, checkOut: addDaysISO(iso, 1) });
+    } else {
+      setSearch({ ...search, checkOut: iso });
+    }
+  };
 
   const langKey = lang as 'uz' | 'ru' | 'en';
 
@@ -226,9 +413,9 @@ export function LandingPage() {
           </div>
 
           {/* ── Booking Search Widget ── */}
-          <div className="bg-white rounded-2xl shadow-xl shadow-cyan-200/30 border border-cyan-100/50 overflow-hidden max-w-4xl mx-auto">
-            {/* Top Row: Tabs */}
-            <div className="flex items-stretch gap-0 border-b border-ink-100 overflow-x-auto grid-no-scrollbar">
+          <div className="bg-white rounded-2xl shadow-xl shadow-cyan-200/30 border border-cyan-100/50 overflow-visible max-w-4xl mx-auto">
+            {/* Top Row: Tabs — evenly distributed */}
+            <div className="grid grid-cols-5 border-b border-ink-100">
               {TABS.map((tab) => {
                 const Icon = tab.icon;
                 const on = activeTab === tab.id;
@@ -236,14 +423,14 @@ export function LandingPage() {
                   <button
                     key={tab.id}
                     onClick={() => { setActiveTab(tab.id); setSearched(false); }}
-                    className={`flex items-center gap-2 px-4 sm:px-5 py-3 text-sm font-bold whitespace-nowrap transition-all border-b-[3px] rounded-t-lg ${
+                    className={`flex items-center justify-center gap-2 px-2 py-3.5 text-sm font-bold whitespace-nowrap transition-all border-b-[3px] rounded-t-lg ${
                       on
                         ? 'bg-gradient-to-b from-cyan-50 to-white text-cyan-700 border-cyan-500'
                         : 'text-ink-500 border-transparent hover:text-ink-700 hover:bg-ink-50/50'
                     }`}
                   >
-                    <Icon size={18} className={on ? 'text-cyan-600' : 'text-ink-400'} />
-                    {tab.labelKey[langKey]}
+                    <Icon size={18} className={on ? 'text-cyan-600' : 'text-ink-400'} shrink-0 />
+                    <span className="hidden xs:inline sm:inline">{tab.labelKey[langKey]}</span>
                   </button>
                 );
               })}
@@ -252,43 +439,97 @@ export function LandingPage() {
             {/* Bottom Row: Inputs + Search */}
             <div className="p-4 flex flex-col sm:flex-row items-stretch gap-3">
               <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
+                {/* Destination — regions dropdown */}
+                <div className="relative" ref={destRef}>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
                     <MapPin size={11} /> {langKey === 'uz' ? "Manzil" : langKey === 'ru' ? 'Куда' : 'Destination'}
                   </label>
-                  <input
-                    value={search.destination}
-                    onChange={(e) => setSearch({ ...search, destination: e.target.value })}
-                    className="w-full mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
-                    placeholder={langKey === 'uz' ? "Shahar yoki mehmonxona" : langKey === 'ru' ? 'Город или отель' : 'City or hotel'}
-                  />
+                  <div className="relative mt-1">
+                    <input
+                      value={destOpen ? destQuery : search.destination}
+                      onChange={(e) => { setDestQuery(e.target.value); setDestOpen(true); }}
+                      onFocus={() => { setDestOpen(true); setDestQuery(''); }}
+                      className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all ${destOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100'}`}
+                      placeholder={langKey === 'uz' ? "Hududni tanlang" : langKey === 'ru' ? 'Выберите регион' : 'Select region'}
+                    />
+                    <MapPinned size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
+                  </div>
+                  {destOpen && (
+                    <div className="absolute z-50 mt-1 w-full bg-white rounded-xl shadow-2xl border border-ink-100 max-h-64 overflow-y-auto animate-fade-in">
+                      {filteredRegions.length === 0 ? (
+                        <p className="px-4 py-3 text-sm text-ink-400">{langKey === 'uz' ? "Topilmadi" : langKey === 'ru' ? 'Не найдено' : 'Not found'}</p>
+                      ) : (
+                        filteredRegions.map((region) => (
+                          <button
+                            key={region}
+                            onClick={() => selectRegion(region)}
+                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-cyan-50 transition-colors flex items-center gap-2 ${search.destination === region ? 'text-cyan-700 font-bold bg-cyan-50/50' : 'text-ink-700'}`}
+                          >
+                            <MapPin size={14} className={search.destination === region ? 'text-cyan-600' : 'text-ink-300'} shrink-0 />
+                            {region}
+                            {search.destination === region && <Check size={14} className="ml-auto text-cyan-600" />}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div>
+
+                {/* Check-in — calendar popup */}
+                <div className="relative">
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
                     <Calendar size={11} /> {langKey === 'uz' ? "Kirish" : langKey === 'ru' ? 'Заезд' : 'Check-in'}
                   </label>
-                  <input
-                    type="date"
-                    value={search.checkIn}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setSearch({ ...search, checkIn: v, checkOut: v >= search.checkOut ? addDaysISO(v, 1) : search.checkOut });
-                    }}
-                    className="w-full mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
-                  />
+                  <button
+                    onClick={() => setCalOpen(calOpen === 'checkIn' ? null : 'checkIn')}
+                    className={`w-full mt-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between ${calOpen === 'checkIn' ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                  >
+                    <span className={search.checkIn ? 'text-ink-800' : 'text-ink-400'}>
+                      {search.checkIn ? new Date(search.checkIn + 'T00:00:00').toLocaleDateString(langKey === 'uz' ? 'uz' : langKey === 'ru' ? 'ru' : 'en', { day: 'numeric', month: 'short', year: 'numeric' }) : (langKey === 'uz' ? 'Sanani tanlang' : langKey === 'ru' ? 'Выберите дату' : 'Select date')}
+                    </span>
+                    <Calendar size={15} className="text-ink-400" />
+                  </button>
+                  {calOpen === 'checkIn' && (
+                    <div ref={calRef}>
+                      <MiniCalendar
+                        value={search.checkIn}
+                        onPick={setCheckInDate}
+                        minDate={todayISO()}
+                        lang={langKey}
+                        onClose={() => setCalOpen(null)}
+                      />
+                    </div>
+                  )}
                 </div>
-                <div>
+
+                {/* Check-out — calendar popup */}
+                <div className="relative">
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
                     <Calendar size={11} /> {langKey === 'uz' ? "Chiqish" : langKey === 'ru' ? 'Выезд' : 'Check-out'}
                   </label>
-                  <input
-                    type="date"
-                    value={search.checkOut}
-                    min={addDaysISO(search.checkIn, 1)}
-                    onChange={(e) => { if (e.target.value > search.checkIn) setSearch({ ...search, checkOut: e.target.value }); }}
-                    className="w-full mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all"
-                  />
+                  <button
+                    onClick={() => setCalOpen(calOpen === 'checkOut' ? null : 'checkOut')}
+                    className={`w-full mt-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between ${calOpen === 'checkOut' ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                  >
+                    <span className={search.checkOut ? 'text-ink-800' : 'text-ink-400'}>
+                      {search.checkOut ? new Date(search.checkOut + 'T00:00:00').toLocaleDateString(langKey === 'uz' ? 'uz' : langKey === 'ru' ? 'ru' : 'en', { day: 'numeric', month: 'short', year: 'numeric' }) : (langKey === 'uz' ? 'Sanani tanlang' : langKey === 'ru' ? 'Выберите дату' : 'Select date')}
+                    </span>
+                    <Calendar size={15} className="text-ink-400" />
+                  </button>
+                  {calOpen === 'checkOut' && (
+                    <div ref={calRef}>
+                      <MiniCalendar
+                        value={search.checkOut}
+                        onPick={setCheckOutDate}
+                        minDate={addDaysISO(search.checkIn, 1)}
+                        lang={langKey}
+                        onClose={() => setCalOpen(null)}
+                      />
+                    </div>
+                  )}
                 </div>
+
+                {/* Guests */}
                 <div>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
                     <Users size={11} /> {langKey === 'uz' ? "Mehmonlar" : langKey === 'ru' ? 'Гости' : 'Guests'}
