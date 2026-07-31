@@ -27,6 +27,10 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPinned,
+  Plus,
+  Minus,
+  X,
+  ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
 import type { UserRole } from '../types';
@@ -38,12 +42,14 @@ import { properties } from '../mockData';
 
 type PropertyTab = 'Hotel' | 'Sanatorium' | 'Resort' | 'Apartment' | 'Hostel';
 
+type RoomConfig = { adults: number; children: number };
+
 const TABS: { id: PropertyTab; icon: LucideIcon; labelKey: { uz: string; ru: string; en: string } }[] = [
   { id: 'Hotel', icon: Hotel, labelKey: { uz: 'Mehmonxona', ru: 'Отель', en: 'Hotel' } },
   { id: 'Sanatorium', icon: HeartPulse, labelKey: { uz: 'Sanatoriya', ru: 'Санаторий', en: 'Sanatorium' } },
   { id: 'Resort', icon: Palmtree, labelKey: { uz: 'Kurort', ru: 'Курорт', en: 'Resort' } },
   { id: 'Apartment', icon: Building2, labelKey: { uz: 'Apartament', ru: 'Апартаменты', en: 'Apartment' } },
-  { id: 'Hostel', icon: BedDouble, labelKey: { uz: 'Xostel', ru: 'Хостел', en: 'Hostel' } },
+  { id: 'Hostel', icon: BedDouble, labelKey: { uz: 'Hostel', ru: 'Хостел', en: 'Hostel' } },
 ];
 
 const PRODUCTS = [
@@ -275,18 +281,22 @@ export function LandingPage() {
   const [form, setForm] = useState({ hotelName: '', contactName: '', phone: '', email: '', city: 'Tashkent', roomCount: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<PropertyTab>('Hotel');
-  const [search, setSearch] = useState({ destination: '', checkIn: todayISO(), checkOut: addDaysISO(todayISO(), 1), guests: '2' });
+  const [search, setSearch] = useState({ destination: '', checkIn: todayISO(), checkOut: addDaysISO(todayISO(), 1) });
+  const [rooms, setRooms] = useState<RoomConfig[]>([{ adults: 2, children: 0 }]);
   const [searched, setSearched] = useState(false);
   const [destOpen, setDestOpen] = useState(false);
   const [destQuery, setDestQuery] = useState('');
   const [calOpen, setCalOpen] = useState<null | 'checkIn' | 'checkOut'>(null);
+  const [guestsOpen, setGuestsOpen] = useState(false);
   const destRef = useRef<HTMLDivElement>(null);
   const calRef = useRef<HTMLDivElement>(null);
+  const guestsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (destRef.current && !destRef.current.contains(e.target as Node)) setDestOpen(false);
       if (calRef.current && !calRef.current.contains(e.target as Node)) setCalOpen(null);
+      if (guestsRef.current && !guestsRef.current.contains(e.target as Node)) setGuestsOpen(false);
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -321,6 +331,21 @@ export function LandingPage() {
   };
 
   const langKey = lang as 'uz' | 'ru' | 'en';
+
+  const addRoom = () => {
+    if (rooms.length < 5) setRooms([...rooms, { adults: 1, children: 0 }]);
+  };
+  const removeRoom = (idx: number) => setRooms(rooms.filter((_, i) => i !== idx));
+  const updateRoom = (idx: number, field: 'adults' | 'children', val: number) =>
+    setRooms(rooms.map((r, i) => (i === idx ? { ...r, [field]: val } : r)));
+  const guestSummary = useMemo(() => {
+    const totalAdults = rooms.reduce((s, r) => s + r.adults, 0);
+    const totalChildren = rooms.reduce((s, r) => s + r.children, 0);
+    const totalPeople = totalAdults + totalChildren;
+    const peopleLabel = langKey === 'uz' ? 'mehmon' : langKey === 'ru' ? 'гостей' : 'guests';
+    const roomLabel = langKey === 'uz' ? 'xona' : langKey === 'ru' ? 'номера' : 'rooms';
+    return `${totalPeople} ${peopleLabel}, ${rooms.length} ${roomLabel}`;
+  }, [rooms, langKey]);
 
   const submitForm = async () => {
     if (!form.hotelName.trim() || !form.contactName.trim() || !form.phone.trim()) {
@@ -393,7 +418,7 @@ export function LandingPage() {
       </header>
 
       {/* ── Hero with booking widget ── */}
-      <section className="relative overflow-hidden">
+      <section className="relative overflow-visible">
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-50 via-white to-blue-50" />
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-8">
           <div className="text-center mb-8">
@@ -437,7 +462,7 @@ export function LandingPage() {
             </div>
 
             {/* Bottom Row: Inputs + Search */}
-            <div className="p-4 flex flex-col sm:flex-row items-stretch gap-3">
+            <div className="p-4 flex flex-col sm:flex-row sm:items-end gap-3">
               <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {/* Destination — regions dropdown */}
                 <div className="relative" ref={destRef}>
@@ -529,18 +554,77 @@ export function LandingPage() {
                   )}
                 </div>
 
-                {/* Guests */}
-                <div>
+                {/* Guests & Rooms — advanced popover */}
+                <div className="relative" ref={guestsRef}>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
                     <Users size={11} /> {langKey === 'uz' ? "Mehmonlar" : langKey === 'ru' ? 'Гости' : 'Guests'}
                   </label>
-                  <select
-                    value={search.guests}
-                    onChange={(e) => setSearch({ ...search, guests: e.target.value })}
-                    className="w-full mt-1 rounded-xl border border-ink-200 px-3 py-2.5 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 transition-all bg-white"
+                  <button
+                    onClick={() => setGuestsOpen(!guestsOpen)}
+                    className={`w-full mt-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between ${guestsOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
                   >
-                    {['1', '2', '3', '4', '5', '6+'].map((g) => <option key={g} value={g}>{g} {langKey === 'uz' ? "mehmon" : langKey === 'ru' ? 'гостя' : 'guests'}</option>)}
-                  </select>
+                    <span className="text-ink-800 truncate">{guestSummary}</span>
+                    <ChevronDown size={15} className={`text-ink-400 shrink-0 transition-transform ${guestsOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {guestsOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-[60] w-[340px] max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl border border-ink-100 p-4 animate-fade-in">
+                      {rooms.map((room, idx) => (
+                        <div key={idx} className={idx > 0 ? 'pt-3 border-t border-ink-100 mt-3' : ''}>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <span className="text-sm font-bold text-ink-900">
+                              {langKey === 'uz' ? `Xona ${idx + 1}` : langKey === 'ru' ? `Номер ${idx + 1}` : `Room ${idx + 1}`}
+                            </span>
+                            {rooms.length > 1 && (
+                              <button onClick={() => removeRoom(idx)} className="text-rose-400 hover:text-rose-600 transition-colors">
+                                <X size={15} />
+                              </button>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="flex items-center justify-between border border-ink-100 rounded-lg px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-ink-800">{langKey === 'uz' ? 'Kattalar' : langKey === 'ru' ? 'Взрослые' : 'Adults'}</p>
+                                <p className="text-[10px] text-ink-400">18+</p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button onClick={() => updateRoom(idx, 'adults', Math.max(1, room.adults - 1))} className="h-7 w-7 rounded-lg border border-ink-200 hover:border-cyan-400 hover:text-cyan-600 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors" disabled={room.adults <= 1}>
+                                  <Minus size={14} />
+                                </button>
+                                <span className="text-sm font-bold w-5 text-center tabular">{room.adults}</span>
+                                <button onClick={() => updateRoom(idx, 'adults', Math.min(10, room.adults + 1))} className="h-7 w-7 rounded-lg border border-ink-200 hover:border-cyan-400 hover:text-cyan-600 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors" disabled={room.adults >= 10}>
+                                  <Plus size={14} />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between border border-ink-100 rounded-lg px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-ink-800">{langKey === 'uz' ? 'Bolalar' : langKey === 'ru' ? 'Дети' : 'Children'}</p>
+                                <p className="text-[10px] text-ink-400">0-17</p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button onClick={() => updateRoom(idx, 'children', Math.max(0, room.children - 1))} className="h-7 w-7 rounded-lg border border-ink-200 hover:border-cyan-400 hover:text-cyan-600 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors" disabled={room.children <= 0}>
+                                  <Minus size={14} />
+                                </button>
+                                <span className="text-sm font-bold w-5 text-center tabular">{room.children}</span>
+                                <button onClick={() => updateRoom(idx, 'children', Math.min(10, room.children + 1))} className="h-7 w-7 rounded-lg border border-ink-200 hover:border-cyan-400 hover:text-cyan-600 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors" disabled={room.children >= 10}>
+                                  <Plus size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {rooms.length < 5 && (
+                        <button onClick={addRoom} className="w-full mt-3 py-2.5 text-sm font-bold text-cyan-600 border border-dashed border-cyan-300 rounded-lg hover:bg-cyan-50 transition-colors flex items-center justify-center gap-1.5">
+                          <Plus size={16} />
+                          {langKey === 'uz' ? "Xona qo'shish" : langKey === 'ru' ? 'Добавить номер' : 'Add a room'}
+                        </button>
+                      )}
+                      <button onClick={() => setGuestsOpen(false)} className="w-full mt-3 py-2.5 text-sm font-extrabold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg shadow-md hover:from-cyan-600 hover:to-blue-700 transition-all">
+                        {langKey === 'uz' ? "Tayyor" : langKey === 'ru' ? 'Готово' : 'Done'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               <button
