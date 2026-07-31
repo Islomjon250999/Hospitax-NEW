@@ -18,7 +18,7 @@ import {
   Zap,
   Hotel,
   HeartPulse,
-  Palmtree,
+  Home,
   BedDouble,
   Search as SearchIcon,
   Calendar,
@@ -47,7 +47,7 @@ type RoomConfig = { adults: number; children: number };
 const TABS: { id: PropertyTab; icon: LucideIcon; labelKey: { uz: string; ru: string; en: string } }[] = [
   { id: 'Hotel', icon: Hotel, labelKey: { uz: 'Mehmonxona', ru: 'Отель', en: 'Hotel' } },
   { id: 'Sanatorium', icon: HeartPulse, labelKey: { uz: 'Sanatoriya', ru: 'Санаторий', en: 'Sanatorium' } },
-  { id: 'Resort', icon: Palmtree, labelKey: { uz: 'Kurort', ru: 'Курорт', en: 'Resort' } },
+  { id: 'Resort', icon: Home, labelKey: { uz: 'Dacha', ru: 'Дача', en: 'Dacha' } },
   { id: 'Apartment', icon: Building2, labelKey: { uz: 'Apartament', ru: 'Апартаменты', en: 'Apartment' } },
   { id: 'Hostel', icon: BedDouble, labelKey: { uz: 'Hostel', ru: 'Хостел', en: 'Hostel' } },
 ];
@@ -154,6 +154,12 @@ const MONTH_NAMES: Record<'uz' | 'ru' | 'en', string[]> = {
   en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
 };
 
+const MONTH_SHORT: Record<'uz' | 'ru' | 'en', string[]> = {
+  uz: ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'],
+  ru: ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+};
+
 const WEEKDAY_SHORT: Record<'uz' | 'ru' | 'en', string[]> = {
   uz: ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'],
   ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
@@ -171,6 +177,10 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 function isBefore(a: Date, b: Date): boolean {
   return toISO(a) < toISO(b);
+}
+function formatDateShort(iso: string, lang: 'uz' | 'ru' | 'en'): string {
+  const d = parseISO(iso);
+  return `${d.getDate()} ${MONTH_SHORT[lang][d.getMonth()]}`;
 }
 
 function DualMonthCalendar({
@@ -505,22 +515,31 @@ export function LandingPage() {
                 {/* Check-in / Check-out — dual-month range calendar */}
                 <div className="relative sm:col-span-2" ref={calRef}>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
-                    <Calendar size={11} /> {langKey === 'uz' ? "Sana oralig'i" : langKey === 'ru' ? 'Даты' : 'Dates'}
+                    <Calendar size={11} /> {langKey === 'uz' ? 'Sanalar' : langKey === 'ru' ? 'Даты' : 'Dates'}
                   </label>
                   <button
                     onClick={() => setCalOpen(!calOpen)}
-                    className={`w-full mt-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between gap-2 ${calOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                    className={`w-full mt-1 rounded-xl border px-3 py-2 text-left outline-none transition-all flex items-stretch overflow-hidden ${calOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
                   >
-                    <span className="text-ink-800 truncate flex items-center gap-1.5">
-                      <span className="truncate">
-                        {new Date(search.checkIn + 'T00:00:00').toLocaleDateString(langKey === 'uz' ? 'uz' : langKey === 'ru' ? 'ru' : 'en', { day: '2-digit', month: 'short' })}
+                    <div className="flex-1 min-w-0 flex flex-col justify-center px-3 py-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-ink-400 leading-tight">
+                        {langKey === 'uz' ? 'Kelish' : langKey === 'ru' ? 'Заезд' : 'Check-in'}
                       </span>
-                      <span className="text-ink-300">→</span>
-                      <span className="truncate">
-                        {new Date(search.checkOut + 'T00:00:00').toLocaleDateString(langKey === 'uz' ? 'uz' : langKey === 'ru' ? 'ru' : 'en', { day: '2-digit', month: 'short' })}
+                      <span className="text-sm font-bold text-ink-800 leading-tight truncate">
+                        {formatDateShort(search.checkIn, langKey)}
                       </span>
-                    </span>
-                    <Calendar size={15} className="text-ink-400 shrink-0" />
+                    </div>
+                    <div className="flex items-center text-ink-300">
+                      <ArrowRight size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-center px-3 py-1 text-right">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-ink-400 leading-tight">
+                        {langKey === 'uz' ? 'Ketish' : langKey === 'ru' ? 'Выезд' : 'Check-out'}
+                      </span>
+                      <span className="text-sm font-bold text-ink-800 leading-tight truncate">
+                        {formatDateShort(search.checkOut, langKey)}
+                      </span>
+                    </div>
                   </button>
                   {calOpen && (
                     <DualMonthCalendar
