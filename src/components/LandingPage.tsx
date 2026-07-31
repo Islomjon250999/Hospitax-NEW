@@ -173,101 +173,110 @@ function isBefore(a: Date, b: Date): boolean {
   return toISO(a) < toISO(b);
 }
 
-function MiniCalendar({
-  value,
+function DualMonthCalendar({
+  checkIn,
+  checkOut,
   onPick,
   minDate,
-  maxDate,
   lang,
-  onClose,
 }: {
-  value: string;
+  checkIn: string;
+  checkOut: string;
   onPick: (iso: string) => void;
   minDate: string;
-  maxDate?: string;
   lang: 'uz' | 'ru' | 'en';
-  onClose: () => void;
 }) {
   const [view, setView] = useState(() => {
-    const d = parseISO(value);
+    const d = parseISO(checkIn);
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const minD = parseISO(minDate);
-  const maxD = maxDate ? parseISO(maxDate) : null;
+  const ciDate = parseISO(checkIn);
+  const coDate = parseISO(checkOut);
 
-  const year = view.getFullYear();
-  const month = view.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const startWeekday = (firstDay.getDay() + 6) % 7; // Monday-first
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const isDisabled = (d: Date): boolean => isBefore(d, today) || isBefore(d, minD);
+  const inRange = (d: Date): boolean => toISO(d) > checkIn && toISO(d) < checkOut;
 
-  const cells: (Date | null)[] = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
+  const renderMonth = (monthDate: Date) => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const startWeekday = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: (Date | null)[] = [];
+    for (let i = 0; i < startWeekday; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
 
-  const isDisabled = (d: Date): boolean => {
-    if (isBefore(d, today)) return true;
-    if (isBefore(d, minD)) return true;
-    if (maxD && isBefore(maxD, d)) return true;
-    return false;
+    return (
+      <div className="flex-1 min-w-0">
+        <div className="text-center mb-2">
+          <span className="text-sm font-bold text-ink-900">{MONTH_NAMES[lang][month]} {year}</span>
+        </div>
+        <div className="grid grid-cols-7 gap-0 mb-1">
+          {WEEKDAY_SHORT[lang].map((w) => (
+            <div key={w} className="text-center text-[10px] font-bold text-ink-400 py-1">{w}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-0">
+          {cells.map((d, i) => {
+            if (!d) return <div key={i} className="h-9" />;
+            const disabled = isDisabled(d);
+            const start = isSameDay(d, ciDate);
+            const end = isSameDay(d, coDate);
+            const range = inRange(d);
+            const isToday = isSameDay(d, today);
+            return (
+              <button
+                key={i}
+                disabled={disabled}
+                onClick={() => onPick(toISO(d))}
+                className="h-9 relative flex items-center justify-center"
+              >
+                {range && <span className="absolute inset-0 bg-cyan-100" />}
+                {start && !end && <span className="absolute right-0 top-0 bottom-0 left-1/2 bg-cyan-100" />}
+                {end && !start && <span className="absolute left-0 top-0 bottom-0 right-1/2 bg-cyan-100" />}
+                <span className={`relative h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                  start || end
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md font-bold'
+                    : range
+                    ? 'text-cyan-700'
+                    : disabled
+                    ? 'text-ink-300 cursor-not-allowed'
+                    : 'text-ink-700 hover:bg-cyan-50'
+                }`}>
+                  {d.getDate()}
+                  {isToday && !start && !end && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-cyan-500" />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
-  const selectedDate = parseISO(value);
-
-  const pick = (d: Date) => {
-    onPick(toISO(d));
-    onClose();
-  };
+  const leftMonth = view;
+  const rightMonth = new Date(view.getFullYear(), view.getMonth() + 1, 1);
 
   return (
-    <div className="absolute z-50 mt-2 bg-white rounded-xl shadow-2xl border border-ink-100 p-3 w-[280px] animate-fade-in">
-      <div className="flex items-center justify-between mb-2">
-        <button
-          onClick={() => setView(new Date(year, month - 1, 1))}
-          className="h-7 w-7 rounded-lg hover:bg-ink-100 flex items-center justify-center text-ink-500"
-        >
-          <ChevronLeft size={16} />
+    <div className="absolute z-[60] mt-2 bg-white rounded-xl shadow-2xl border border-ink-100 p-4 w-[640px] max-w-[calc(100vw-2rem)] animate-fade-in left-0">
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={() => setView(new Date(leftMonth.getFullYear(), leftMonth.getMonth() - 1, 1))} className="h-8 w-8 rounded-lg hover:bg-ink-100 flex items-center justify-center text-ink-500 transition-colors">
+          <ChevronLeft size={18} />
         </button>
-        <span className="text-sm font-bold text-ink-900">{MONTH_NAMES[lang][month]} {year}</span>
-        <button
-          onClick={() => setView(new Date(year, month + 1, 1))}
-          className="h-7 w-7 rounded-lg hover:bg-ink-100 flex items-center justify-center text-ink-500"
-        >
-          <ChevronRight size={16} />
+        <span className="text-xs font-semibold text-ink-400">
+          {lang === 'uz' ? "Sana oralig'ini tanlang" : lang === 'ru' ? 'Выберите диапазон дат' : 'Select date range'}
+        </span>
+        <button onClick={() => setView(new Date(leftMonth.getFullYear(), leftMonth.getMonth() + 1, 1))} className="h-8 w-8 rounded-lg hover:bg-ink-100 flex items-center justify-center text-ink-500 transition-colors">
+          <ChevronRight size={18} />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-1 mb-1">
-        {WEEKDAY_SHORT[lang].map((w) => (
-          <div key={w} className="text-center text-[10px] font-bold text-ink-400 py-1">{w}</div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {cells.map((d, i) => {
-          if (!d) return <div key={i} />;
-          const disabled = isDisabled(d);
-          const selected = isSameDay(d, selectedDate);
-          const isToday = isSameDay(d, today);
-          return (
-            <button
-              key={i}
-              disabled={disabled}
-              onClick={() => pick(d)}
-              className={`h-8 w-8 rounded-lg text-xs font-semibold transition-all relative ${
-                selected
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md'
-                  : disabled
-                  ? 'text-ink-300 cursor-not-allowed'
-                  : 'text-ink-700 hover:bg-cyan-50 hover:text-cyan-700'
-              }`}
-            >
-              {d.getDate()}
-              {isToday && !selected && <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-cyan-500" />}
-            </button>
-          );
-        })}
+      <div className="flex gap-6">
+        {renderMonth(leftMonth)}
+        {renderMonth(rightMonth)}
       </div>
     </div>
   );
@@ -286,7 +295,7 @@ export function LandingPage() {
   const [searched, setSearched] = useState(false);
   const [destOpen, setDestOpen] = useState(false);
   const [destQuery, setDestQuery] = useState('');
-  const [calOpen, setCalOpen] = useState<null | 'checkIn' | 'checkOut'>(null);
+  const [calOpen, setCalOpen] = useState(false);
   const [guestsOpen, setGuestsOpen] = useState(false);
   const destRef = useRef<HTMLDivElement>(null);
   const calRef = useRef<HTMLDivElement>(null);
@@ -295,7 +304,7 @@ export function LandingPage() {
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (destRef.current && !destRef.current.contains(e.target as Node)) setDestOpen(false);
-      if (calRef.current && !calRef.current.contains(e.target as Node)) setCalOpen(null);
+      if (calRef.current && !calRef.current.contains(e.target as Node)) setCalOpen(false);
       if (guestsRef.current && !guestsRef.current.contains(e.target as Node)) setGuestsOpen(false);
     }
     document.addEventListener('mousedown', handler);
@@ -314,19 +323,12 @@ export function LandingPage() {
     setDestQuery('');
   };
 
-  const setCheckInDate = (iso: string) => {
-    const next = addDaysISO(iso, 1);
-    setSearch({
-      ...search,
-      checkIn: iso,
-      checkOut: iso >= search.checkOut ? next : search.checkOut,
-    });
-  };
-  const setCheckOutDate = (iso: string) => {
+  const pickDate = (iso: string) => {
     if (iso <= search.checkIn) {
       setSearch({ ...search, checkIn: iso, checkOut: addDaysISO(iso, 1) });
     } else {
       setSearch({ ...search, checkOut: iso });
+      setCalOpen(false);
     }
   };
 
@@ -463,7 +465,7 @@ export function LandingPage() {
 
             {/* Bottom Row: Inputs + Search */}
             <div className="p-4 flex flex-col sm:flex-row sm:items-end gap-3">
-              <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
                 {/* Destination — regions dropdown */}
                 <div className="relative" ref={destRef}>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
@@ -500,57 +502,34 @@ export function LandingPage() {
                   )}
                 </div>
 
-                {/* Check-in — calendar popup */}
-                <div className="relative">
+                {/* Check-in / Check-out — dual-month range calendar */}
+                <div className="relative sm:col-span-2" ref={calRef}>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
-                    <Calendar size={11} /> {langKey === 'uz' ? "Kirish" : langKey === 'ru' ? 'Заезд' : 'Check-in'}
+                    <Calendar size={11} /> {langKey === 'uz' ? "Sana oralig'i" : langKey === 'ru' ? 'Даты' : 'Dates'}
                   </label>
                   <button
-                    onClick={() => setCalOpen(calOpen === 'checkIn' ? null : 'checkIn')}
-                    className={`w-full mt-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between ${calOpen === 'checkIn' ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                    onClick={() => setCalOpen(!calOpen)}
+                    className={`w-full mt-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between gap-2 ${calOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
                   >
-                    <span className={search.checkIn ? 'text-ink-800' : 'text-ink-400'}>
-                      {search.checkIn ? new Date(search.checkIn + 'T00:00:00').toLocaleDateString(langKey === 'uz' ? 'uz' : langKey === 'ru' ? 'ru' : 'en', { day: 'numeric', month: 'short', year: 'numeric' }) : (langKey === 'uz' ? 'Sanani tanlang' : langKey === 'ru' ? 'Выберите дату' : 'Select date')}
+                    <span className="text-ink-800 truncate flex items-center gap-1.5">
+                      <span className="truncate">
+                        {new Date(search.checkIn + 'T00:00:00').toLocaleDateString(langKey === 'uz' ? 'uz' : langKey === 'ru' ? 'ru' : 'en', { day: '2-digit', month: 'short' })}
+                      </span>
+                      <span className="text-ink-300">→</span>
+                      <span className="truncate">
+                        {new Date(search.checkOut + 'T00:00:00').toLocaleDateString(langKey === 'uz' ? 'uz' : langKey === 'ru' ? 'ru' : 'en', { day: '2-digit', month: 'short' })}
+                      </span>
                     </span>
-                    <Calendar size={15} className="text-ink-400" />
+                    <Calendar size={15} className="text-ink-400 shrink-0" />
                   </button>
-                  {calOpen === 'checkIn' && (
-                    <div ref={calRef}>
-                      <MiniCalendar
-                        value={search.checkIn}
-                        onPick={setCheckInDate}
-                        minDate={todayISO()}
-                        lang={langKey}
-                        onClose={() => setCalOpen(null)}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Check-out — calendar popup */}
-                <div className="relative">
-                  <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
-                    <Calendar size={11} /> {langKey === 'uz' ? "Chiqish" : langKey === 'ru' ? 'Выезд' : 'Check-out'}
-                  </label>
-                  <button
-                    onClick={() => setCalOpen(calOpen === 'checkOut' ? null : 'checkOut')}
-                    className={`w-full mt-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between ${calOpen === 'checkOut' ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
-                  >
-                    <span className={search.checkOut ? 'text-ink-800' : 'text-ink-400'}>
-                      {search.checkOut ? new Date(search.checkOut + 'T00:00:00').toLocaleDateString(langKey === 'uz' ? 'uz' : langKey === 'ru' ? 'ru' : 'en', { day: 'numeric', month: 'short', year: 'numeric' }) : (langKey === 'uz' ? 'Sanani tanlang' : langKey === 'ru' ? 'Выберите дату' : 'Select date')}
-                    </span>
-                    <Calendar size={15} className="text-ink-400" />
-                  </button>
-                  {calOpen === 'checkOut' && (
-                    <div ref={calRef}>
-                      <MiniCalendar
-                        value={search.checkOut}
-                        onPick={setCheckOutDate}
-                        minDate={addDaysISO(search.checkIn, 1)}
-                        lang={langKey}
-                        onClose={() => setCalOpen(null)}
-                      />
-                    </div>
+                  {calOpen && (
+                    <DualMonthCalendar
+                      checkIn={search.checkIn}
+                      checkOut={search.checkOut}
+                      onPick={pickDate}
+                      minDate={todayISO()}
+                      lang={langKey}
+                    />
                   )}
                 </div>
 
