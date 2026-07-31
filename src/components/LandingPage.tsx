@@ -32,6 +32,7 @@ import {
   X,
   ChevronDown,
   LogIn,
+  Gift,
   type LucideIcon,
 } from 'lucide-react';
 import type { UserRole } from '../types';
@@ -40,6 +41,7 @@ import { useLang } from '../i18n';
 import { useToast } from '../toast';
 import { createConnectionRequest } from '../lib/hotelData';
 import { properties } from '../mockData';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 type PropertyTab = 'Hotel' | 'Sanatorium' | 'Resort' | 'Apartment' | 'Hostel';
 
@@ -184,6 +186,14 @@ function formatDateShort(iso: string, lang: 'uz' | 'ru' | 'en'): string {
   return `${d.getDate()} ${MONTH_SHORT[lang][d.getMonth()]}`;
 }
 
+function dailyRate(d: Date): number {
+  const dow = d.getDay();
+  const seasonal = [40, 35, 30, 35, 55, 70, 70][dow];
+  const monthRamp = 1 + Math.sin((d.getMonth() / 12) * Math.PI * 2) * 0.18;
+  const daySeed = ((d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate()) % 7) * 3;
+  return Math.round((seasonal + daySeed) * monthRamp) * 1000;
+}
+
 function DualMonthCalendar({
   checkIn,
   checkOut,
@@ -233,34 +243,43 @@ function DualMonthCalendar({
         </div>
         <div className="grid grid-cols-7 gap-0">
           {cells.map((d, i) => {
-            if (!d) return <div key={i} className="h-9" />;
+            if (!d) return <div key={i} className="h-14" />;
             const disabled = isDisabled(d);
             const start = isSameDay(d, ciDate);
             const end = isSameDay(d, coDate);
             const range = inRange(d);
             const isToday = isSameDay(d, today);
+            const rate = disabled ? null : dailyRate(d);
             return (
               <button
                 key={i}
                 disabled={disabled}
                 onClick={() => onPick(toISO(d))}
-                className="h-9 relative flex items-center justify-center"
+                className="h-14 relative flex flex-col items-center justify-center gap-0.5 group"
               >
                 {range && <span className="absolute inset-0 bg-cyan-100" />}
                 {start && !end && <span className="absolute right-0 top-0 bottom-0 left-1/2 bg-cyan-100" />}
                 {end && !start && <span className="absolute left-0 top-0 bottom-0 right-1/2 bg-cyan-100" />}
-                <span className={`relative h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
+                <span className={`relative h-7 w-7 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
                   start || end
                     ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md font-bold'
                     : range
                     ? 'text-cyan-700'
                     : disabled
                     ? 'text-ink-300 cursor-not-allowed'
-                    : 'text-ink-700 hover:bg-cyan-50'
+                    : 'text-ink-700 group-hover:bg-cyan-50'
                 }`}>
                   {d.getDate()}
-                  {isToday && !start && !end && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-cyan-500" />}
                 </span>
+                {rate !== null && !start && !end && (
+                  <span className={`relative text-[9px] font-medium leading-none ${disabled ? 'text-ink-300' : 'text-emerald-600/80'}`}>
+                    {(rate / 1000).toFixed(0)}k
+                  </span>
+                )}
+                {rate !== null && (start || end) && (
+                  <span className="relative text-[9px] font-medium leading-none text-white/90">{(rate / 1000).toFixed(0)}k</span>
+                )}
+                {isToday && !start && !end && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-cyan-500" />}
               </button>
             );
           })}
@@ -273,7 +292,7 @@ function DualMonthCalendar({
   const rightMonth = new Date(view.getFullYear(), view.getMonth() + 1, 1);
 
   return (
-    <div className="absolute z-[60] mt-2 bg-white rounded-xl shadow-2xl border border-ink-100 p-4 w-[640px] max-w-[calc(100vw-2rem)] animate-fade-in left-0">
+    <div className="absolute z-[60] mt-2 bg-white rounded-xl shadow-2xl border border-ink-100 p-4 w-[680px] max-w-[calc(100vw-2rem)] animate-fade-in left-0">
       <div className="flex items-center justify-between mb-3">
         <button onClick={() => setView(new Date(leftMonth.getFullYear(), leftMonth.getMonth() - 1, 1))} className="h-8 w-8 rounded-lg hover:bg-ink-100 flex items-center justify-center text-ink-500 transition-colors">
           <ChevronLeft size={18} />
@@ -288,6 +307,14 @@ function DualMonthCalendar({
       <div className="flex gap-6">
         {renderMonth(leftMonth)}
         {renderMonth(rightMonth)}
+      </div>
+      <div className="mt-3 pt-3 border-t border-ink-100 flex items-center justify-between">
+        <span className="text-[10px] font-semibold text-ink-400">
+          {lang === 'uz' ? 'Narxlar UZS/kun' : lang === 'ru' ? 'Цены в UZS/ночь' : 'Prices in UZS/night'}
+        </span>
+        <button onClick={() => onPick('')} className="text-xs font-bold text-cyan-600 hover:text-cyan-700">
+          {lang === 'uz' ? "Tozalash" : lang === 'ru' ? 'Очистить' : 'Clear'}
+        </button>
       </div>
     </div>
   );
@@ -308,18 +335,16 @@ export function LandingPage() {
   const [destQuery, setDestQuery] = useState('');
   const [calOpen, setCalOpen] = useState(false);
   const [guestsOpen, setGuestsOpen] = useState(false);
-  const [langOpen, setLangOpen] = useState(false);
+  const [guestLoginOpen, setGuestLoginOpen] = useState(false);
   const destRef = useRef<HTMLDivElement>(null);
   const calRef = useRef<HTMLDivElement>(null);
   const guestsRef = useRef<HTMLDivElement>(null);
-  const langRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (destRef.current && !destRef.current.contains(e.target as Node)) setDestOpen(false);
       if (calRef.current && !calRef.current.contains(e.target as Node)) setCalOpen(false);
       if (guestsRef.current && !guestsRef.current.contains(e.target as Node)) setGuestsOpen(false);
-      if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false);
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -338,6 +363,10 @@ export function LandingPage() {
   };
 
   const pickDate = (iso: string) => {
+    if (!iso) {
+      setSearch({ ...search, checkIn: todayISO(), checkOut: addDaysISO(todayISO(), 1) });
+      return;
+    }
     if (iso <= search.checkIn) {
       setSearch({ ...search, checkIn: iso, checkOut: addDaysISO(iso, 1) });
     } else {
@@ -435,41 +464,14 @@ export function LandingPage() {
             </a>
           </nav>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="relative" ref={langRef}>
-              <button
-                onClick={() => setLangOpen(!langOpen)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-2 text-sm font-semibold text-ink-600 hover:text-cyan-600 rounded-lg hover:bg-cyan-50/60 transition-colors"
-              >
-                <Globe size={16} />
-                <span className="hidden sm:inline">{lang === 'uz' ? "O'zbek" : lang === 'ru' ? 'Русский' : 'English'}</span>
-                <ChevronDown size={14} className={`text-ink-400 transition-transform ${langOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {langOpen && (
-                <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-2xl border border-ink-100 py-1 animate-fade-in z-50">
-                  {([
-                    { code: 'uz' as const, label: "O'zbek tili" },
-                    { code: 'ru' as const, label: 'Русский язык' },
-                    { code: 'en' as const, label: 'English' },
-                  ]).map((l) => (
-                    <button
-                      key={l.code}
-                      onClick={() => { setLang(l.code); setLangOpen(false); }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-cyan-50 transition-colors flex items-center justify-between ${lang === l.code ? 'text-cyan-700 font-bold bg-cyan-50/50' : 'text-ink-700'}`}
-                    >
-                      {l.label}
-                      {lang === l.code && <Check size={14} className="text-cyan-600" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <LanguageSwitcher />
             <button
-              onClick={() => toast(langKey === 'uz' ? "Mehmonlar kabineti tez kunda" : langKey === 'ru' ? 'Личный кабинет гостей скоро' : 'Guest portal coming soon', 'info')}
+              onClick={() => setGuestLoginOpen(true)}
               className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-bold text-cyan-700 bg-cyan-50 rounded-lg hover:bg-cyan-100 transition-colors"
             >
               <LogIn size={16} />
-              <span className="hidden sm:inline">{langKey === 'uz' ? "Mehmonlar uchun kirish" : langKey === 'ru' ? 'Вход для гостей' : 'Guest Login'}</span>
-              <span className="sm:hidden">{langKey === 'uz' ? 'Mehmon' : langKey === 'ru' ? 'Гости' : 'Guest'}</span>
+              <span className="hidden sm:inline">{langKey === 'uz' ? "Shaxsiy kabinetga kirish" : langKey === 'ru' ? 'Войти в личный кабинет' : 'Sign In'}</span>
+              <span className="sm:hidden">{langKey === 'uz' ? 'Kirish' : langKey === 'ru' ? 'Войти' : 'Sign In'}</span>
             </button>
           </div>
         </div>
@@ -520,21 +522,21 @@ export function LandingPage() {
             </div>
 
             {/* Bottom Row: Inputs + Search */}
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-5 gap-3 items-stretch">
+            <div className="p-3 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
                 {/* Destination — regions dropdown */}
-                <div className="relative flex flex-col" ref={destRef}>
-                  <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
-                    <MapPin size={11} /> {langKey === 'uz' ? "Manzil" : langKey === 'ru' ? 'Куда' : 'Destination'}
+                <div className="relative flex flex-col sm:col-span-3" ref={destRef}>
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1 mb-1">
+                    <MapPin size={10} /> {langKey === 'uz' ? "Manzil" : langKey === 'ru' ? 'Куда' : 'Destination'}
                   </label>
-                  <div className="relative mt-1 flex-1 flex">
+                  <div className="relative flex-1 flex">
                     <input
                       value={destOpen ? destQuery : search.destination}
                       onChange={(e) => { setDestQuery(e.target.value); setDestOpen(true); }}
                       onFocus={() => { setDestOpen(true); setDestQuery(''); }}
-                      className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all ${destOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100'}`}
+                      className={`w-full rounded-lg border px-2.5 py-2 text-sm outline-none transition-all ${destOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100'}`}
                       placeholder={langKey === 'uz' ? "Hududni tanlang" : langKey === 'ru' ? 'Выберите регион' : 'Select region'}
                     />
-                    <MapPinned size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
+                    <MapPinned size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 pointer-events-none" />
                   </div>
                   {destOpen && (
                     <div className="absolute z-50 mt-1 w-full bg-white rounded-xl shadow-2xl border border-ink-100 max-h-64 overflow-y-auto animate-fade-in">
@@ -557,34 +559,17 @@ export function LandingPage() {
                   )}
                 </div>
 
-                {/* Check-in / Check-out — dual-month range calendar */}
-                <div className="relative sm:col-span-2 flex flex-col" ref={calRef}>
-                  <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
-                    <Calendar size={11} /> {langKey === 'uz' ? 'Sanalar' : langKey === 'ru' ? 'Даты' : 'Dates'}
+                {/* Check-in — opens dual-month calendar */}
+                <div className="relative flex flex-col sm:col-span-2" ref={calRef}>
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1 mb-1">
+                    <Calendar size={10} /> {langKey === 'uz' ? 'Kelish' : langKey === 'ru' ? 'Заезд' : 'Check-in'}
                   </label>
                   <button
                     onClick={() => setCalOpen(!calOpen)}
-                    className={`w-full mt-1 flex-1 rounded-xl border px-3 py-2 text-left outline-none transition-all flex items-stretch overflow-hidden ${calOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                    className={`w-full flex-1 rounded-lg border px-2.5 py-2 text-left outline-none transition-all flex items-center gap-1.5 ${calOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
                   >
-                    <div className="flex-1 min-w-0 flex flex-col justify-center px-3 py-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-ink-400 leading-tight">
-                        {langKey === 'uz' ? 'Kelish' : langKey === 'ru' ? 'Заезд' : 'Check-in'}
-                      </span>
-                      <span className="text-sm font-bold text-ink-800 leading-tight truncate">
-                        {formatDateShort(search.checkIn, langKey)}
-                      </span>
-                    </div>
-                    <div className="flex items-center text-ink-300">
-                      <ArrowRight size={16} />
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-center px-3 py-1 text-right">
-                      <span className="text-[10px] font-bold uppercase tracking-wide text-ink-400 leading-tight">
-                        {langKey === 'uz' ? 'Ketish' : langKey === 'ru' ? 'Выезд' : 'Check-out'}
-                      </span>
-                      <span className="text-sm font-bold text-ink-800 leading-tight truncate">
-                        {formatDateShort(search.checkOut, langKey)}
-                      </span>
-                    </div>
+                    <Calendar size={14} className="text-ink-400 shrink-0" />
+                    <span className="text-sm font-bold text-ink-800 truncate">{formatDateShort(search.checkIn, langKey)}</span>
                   </button>
                   {calOpen && (
                     <DualMonthCalendar
@@ -597,20 +582,34 @@ export function LandingPage() {
                   )}
                 </div>
 
+                {/* Check-out — opens same dual-month calendar */}
+                <div className="relative flex flex-col sm:col-span-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1 mb-1">
+                    <Calendar size={10} /> {langKey === 'uz' ? 'Ketish' : langKey === 'ru' ? 'Выезд' : 'Check-out'}
+                  </label>
+                  <button
+                    onClick={() => setCalOpen(!calOpen)}
+                    className={`w-full flex-1 rounded-lg border px-2.5 py-2 text-left outline-none transition-all flex items-center gap-1.5 ${calOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                  >
+                    <Calendar size={14} className="text-ink-400 shrink-0" />
+                    <span className="text-sm font-bold text-ink-800 truncate">{formatDateShort(search.checkOut, langKey)}</span>
+                  </button>
+                </div>
+
                 {/* Guests & Rooms — advanced popover */}
-                <div className="relative flex flex-col" ref={guestsRef}>
-                  <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
-                    <Users size={11} /> {langKey === 'uz' ? "Mehmonlar" : langKey === 'ru' ? 'Гости' : 'Guests'}
+                <div className="relative flex flex-col sm:col-span-3" ref={guestsRef}>
+                  <label className="text-[10px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1 mb-1">
+                    <Users size={10} /> {langKey === 'uz' ? "Mehmonlar" : langKey === 'ru' ? 'Гости' : 'Guests'}
                   </label>
                   <button
                     onClick={() => setGuestsOpen(!guestsOpen)}
-                    className={`w-full mt-1 flex-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between ${guestsOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                    className={`w-full flex-1 rounded-lg border px-2.5 py-2 text-sm text-left outline-none transition-all flex items-center justify-between ${guestsOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
                   >
-                    <span className="text-ink-800 truncate">{guestSummary}</span>
-                    <ChevronDown size={15} className={`text-ink-400 shrink-0 transition-transform ${guestsOpen ? 'rotate-180' : ''}`} />
+                    <span className="text-ink-800 truncate text-xs font-semibold">{guestSummary}</span>
+                    <ChevronDown size={14} className={`text-ink-400 shrink-0 transition-transform ${guestsOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {guestsOpen && (
-                    <div className="absolute right-0 top-full mt-1 z-[60] w-[340px] max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl border border-ink-100 p-4 animate-fade-in">
+                    <div className="absolute right-0 top-full mt-1 z-[60] w-[320px] max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl border border-ink-100 p-4 animate-fade-in">
                       {rooms.map((room, idx) => (
                         <div key={idx} className={idx > 0 ? 'pt-3 border-t border-ink-100 mt-3' : ''}>
                           <div className="flex items-center justify-between mb-2.5">
@@ -669,19 +668,17 @@ export function LandingPage() {
                     </div>
                   )}
                 </div>
-              {/* Search */}
-              <div className="flex flex-col">
-                <span className="text-[11px] font-bold uppercase tracking-wide text-transparent select-none flex items-center gap-1" aria-hidden>
-                  <Calendar size={11} /> ·
-                </span>
-                <button
-                  onClick={handleSearch}
-                  className="mt-1 flex-1 inline-flex items-center justify-center gap-2 px-6 text-sm font-extrabold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl shadow-lg shadow-cyan-300/40 hover:from-cyan-600 hover:to-blue-700 hover:shadow-xl transition-all"
-                >
-                  <SearchIcon size={18} />
-                  {langKey === 'uz' ? "Qidirish" : langKey === 'ru' ? 'Искать' : 'Search'}
-                </button>
-              </div>
+
+                {/* Search */}
+                <div className="flex flex-col sm:col-span-2">
+                  <button
+                    onClick={handleSearch}
+                    className="w-full flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-extrabold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg shadow-lg shadow-cyan-300/40 hover:from-cyan-600 hover:to-blue-700 hover:shadow-xl transition-all"
+                  >
+                    <SearchIcon size={16} />
+                    {langKey === 'uz' ? "Qidirish" : langKey === 'ru' ? 'Искать' : 'Search'}
+                  </button>
+                </div>
             </div>
           </div>
         </div>
@@ -925,6 +922,65 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* ── Guest Login (Loyalty) Modal ── */}
+      {guestLoginOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setGuestLoginOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-200/40">
+                  <Gift size={20} className="text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-ink-900">
+                  {langKey === 'uz' ? "Shaxsiy kabinetga kirish" : langKey === 'ru' ? 'Вход в личный кабинет' : 'Sign In'}
+                </h3>
+              </div>
+              <button onClick={() => setGuestLoginOpen(false)} className="btn-ghost h-8 w-8 !p-0 rounded-lg">✕</button>
+            </div>
+            <div className="rounded-xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-4 mb-5">
+              <div className="flex items-start gap-2.5">
+                <Gift size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-amber-900">
+                    {langKey === 'uz' ? 'Sodiqlik dasturi' : langKey === 'ru' ? 'Программа лояльности' : 'Loyalty Program'}
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                    {langKey === 'uz'
+                      ? "Kirgan mehmonlar bizning Sodiqlik dasturiga qo'shiladi va tezkor bronlar uchun kelajakdagi chegirmalar hamda maxsus narxlarga ega bo'ladi."
+                      : langKey === 'ru'
+                      ? 'Войдя в систему, гости присоединяются к нашей программе лояльности и получают будущие скидки и специальные тарифы за частые бронирования.'
+                      : 'By signing in, guests join our Loyalty Program and unlock future discounts and special rates for frequent bookings.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="label">{langKey === 'uz' ? 'Email yoki telefon' : langKey === 'ru' ? 'Email или телефон' : 'Email or phone'}</label>
+                <input className="input" placeholder={langKey === 'uz' ? 'guest@email.com' : 'guest@email.com'} />
+              </div>
+              <div>
+                <label className="label">{langKey === 'uz' ? 'Parol' : langKey === 'ru' ? 'Пароль' : 'Password'}</label>
+                <input className="input" type="password" placeholder="••••••••" />
+              </div>
+              <button
+                onClick={() => { setGuestLoginOpen(false); toast(langKey === 'uz' ? 'Mehmonlar kabineti tez kunda ishga tushadi' : langKey === 'ru' ? 'Гостевой кабинет скоро будет доступен' : 'Guest portal coming soon', 'info'); }}
+                className="w-full inline-flex items-center justify-center gap-2 py-3 text-sm font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg shadow-lg shadow-amber-200/40 hover:from-amber-600 hover:to-orange-600 transition-all"
+              >
+                <LogIn size={16} />
+                {langKey === 'uz' ? "Kirish" : langKey === 'ru' ? 'Войти' : 'Sign In'}
+              </button>
+              <p className="text-center text-xs text-ink-400">
+                {langKey === 'uz' ? "Hisobingiz yo'qmi? " : langKey === 'ru' ? 'Нет аккаунта? ' : "Don't have an account? "}
+                <span className="font-bold text-cyan-600 cursor-pointer hover:underline">
+                  {langKey === 'uz' ? "Ro'yxatdan o'tish" : langKey === 'ru' ? 'Регистрация' : 'Sign up'}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Login Modal ── */}
       {loginOpen && (

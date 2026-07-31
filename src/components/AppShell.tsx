@@ -12,18 +12,18 @@ import {
   HelpCircle,
   CreditCard,
   Sparkles,
-  Globe,
-  Check,
   Crown,
   ShieldCheck,
   Store,
   Calendar,
+  CheckCircle2,
   type LucideIcon,
 } from 'lucide-react';
 import { notifications as seedNotifs } from '../mockData';
-import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel, Avatar, SlideOver, FlagIcon } from './ui';
+import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel, Avatar, SlideOver } from './ui';
 import { useToast } from '../toast';
-import { useLang, LANGUAGES } from '../i18n';
+import { useLang } from '../i18n';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { useAuth, ROLE_LABELS } from '../lib/auth';
 import type { UserRole } from '../types';
 
@@ -148,36 +148,7 @@ export function AppShell({
             )}
 
             {/* Language selector */}
-            <Dropdown
-              width="w-52"
-              trigger={
-                <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl hover:bg-ink-100 transition-colors text-sm font-semibold text-ink-700">
-                  <FlagIcon code={lang} size="sm" />
-                  <span className="text-xs font-bold tracking-wide">{LANGUAGES.find((l) => l.code === lang)?.shortCode}</span>
-                  <ChevronDown size={13} className="text-ink-400" />
-                </button>
-              }
-            >
-              {(close) => (
-                <>
-                  <DropdownLabel>{t('nav_settings')}: Language</DropdownLabel>
-                  {LANGUAGES.map((l) => (
-                    <button
-                      key={l.code}
-                      onClick={() => { setLang(l.code); close(); toast(l.label, 'info'); }}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
-                        lang === l.code ? 'bg-indigo-50 text-indigo-700' : 'text-ink-700 hover:bg-ink-100'
-                      }`}
-                    >
-                      <FlagIcon code={l.code} size="sm" />
-                      <span className="flex-1">{l.label}</span>
-                      <span className="text-[10px] font-bold text-ink-400 uppercase">{l.shortCode}</span>
-                      {lang === l.code && <Check size={14} className="text-indigo-600" />}
-                    </button>
-                  ))}
-                </>
-              )}
-            </Dropdown>
+            <LanguageSwitcher />
 
             {/* User dropdown */}
             <Dropdown
@@ -211,7 +182,7 @@ export function AppShell({
                         >
                           <RoleIcon2 size={15} className={user?.role === role ? 'text-indigo-600' : 'text-ink-400'} />
                           <span className="flex-1">{ROLE_LABELS[role][langKey]}</span>
-                          {user?.role === role && <Check size={14} className="text-indigo-600" />}
+                          {user?.role === role && <CheckCircle2 size={14} className="text-indigo-600" />}
                         </button>
                       );
                     })}
