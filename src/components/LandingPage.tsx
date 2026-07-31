@@ -31,6 +31,7 @@ import {
   Minus,
   X,
   ChevronDown,
+  LogIn,
   type LucideIcon,
 } from 'lucide-react';
 import type { UserRole } from '../types';
@@ -293,7 +294,7 @@ function DualMonthCalendar({
 }
 
 export function LandingPage() {
-  const { lang, t } = useLang();
+  const { lang, setLang, t } = useLang();
   const { login } = useAuth();
   const toast = useToast();
   const [loginOpen, setLoginOpen] = useState(false);
@@ -307,15 +308,18 @@ export function LandingPage() {
   const [destQuery, setDestQuery] = useState('');
   const [calOpen, setCalOpen] = useState(false);
   const [guestsOpen, setGuestsOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
   const destRef = useRef<HTMLDivElement>(null);
   const calRef = useRef<HTMLDivElement>(null);
   const guestsRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (destRef.current && !destRef.current.contains(e.target as Node)) setDestOpen(false);
       if (calRef.current && !calRef.current.contains(e.target as Node)) setCalOpen(false);
       if (guestsRef.current && !guestsRef.current.contains(e.target as Node)) setGuestsOpen(false);
+      if (langRef.current && !langRef.current.contains(e.target as Node)) setLangOpen(false);
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -407,8 +411,8 @@ export function LandingPage() {
     <div className="min-h-screen bg-white">
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-ink-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 shrink-0">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-200/50">
               <Building2 size={20} className="text-white" />
             </div>
@@ -419,13 +423,55 @@ export function LandingPage() {
               <p className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Hospitality Cloud</p>
             </div>
           </div>
-          <button
-            onClick={() => setLoginOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg shadow-lg shadow-cyan-200/40 hover:from-cyan-600 hover:to-blue-700 transition-all"
-          >
-            <ShieldCheck size={16} />
-            {langKey === 'uz' ? "Shaxsiy kabinetga kirish" : langKey === 'ru' ? 'Войти в личный кабинет' : 'Login / Sign In'}
-          </button>
+          <nav className="hidden md:flex items-center gap-1">
+            <a href="#about" className="px-3 py-2 text-sm font-semibold text-ink-600 hover:text-cyan-600 rounded-lg hover:bg-cyan-50/60 transition-colors">
+              {langKey === 'uz' ? 'Biz haqimizda' : langKey === 'ru' ? 'О нас' : 'About Us'}
+            </a>
+            <a href="#products" className="px-3 py-2 text-sm font-semibold text-ink-600 hover:text-cyan-600 rounded-lg hover:bg-cyan-50/60 transition-colors">
+              {langKey === 'uz' ? 'Mahsulotlar' : langKey === 'ru' ? 'Продукты' : 'Products'}
+            </a>
+            <a href="#contact" className="px-3 py-2 text-sm font-semibold text-ink-600 hover:text-cyan-600 rounded-lg hover:bg-cyan-50/60 transition-colors">
+              {langKey === 'uz' ? "Biz bilan bog'lanish" : langKey === 'ru' ? 'Связаться с нами' : 'Contact Us'}
+            </a>
+          </nav>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative" ref={langRef}>
+              <button
+                onClick={() => setLangOpen(!langOpen)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-2 text-sm font-semibold text-ink-600 hover:text-cyan-600 rounded-lg hover:bg-cyan-50/60 transition-colors"
+              >
+                <Globe size={16} />
+                <span className="hidden sm:inline">{lang === 'uz' ? "O'zbek" : lang === 'ru' ? 'Русский' : 'English'}</span>
+                <ChevronDown size={14} className={`text-ink-400 transition-transform ${langOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {langOpen && (
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-2xl border border-ink-100 py-1 animate-fade-in z-50">
+                  {([
+                    { code: 'uz' as const, label: "O'zbek tili" },
+                    { code: 'ru' as const, label: 'Русский язык' },
+                    { code: 'en' as const, label: 'English' },
+                  ]).map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => { setLang(l.code); setLangOpen(false); }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-cyan-50 transition-colors flex items-center justify-between ${lang === l.code ? 'text-cyan-700 font-bold bg-cyan-50/50' : 'text-ink-700'}`}
+                    >
+                      {l.label}
+                      {lang === l.code && <Check size={14} className="text-cyan-600" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => toast(langKey === 'uz' ? "Mehmonlar kabineti tez kunda" : langKey === 'ru' ? 'Личный кабинет гостей скоро' : 'Guest portal coming soon', 'info')}
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-bold text-cyan-700 bg-cyan-50 rounded-lg hover:bg-cyan-100 transition-colors"
+            >
+              <LogIn size={16} />
+              <span className="hidden sm:inline">{langKey === 'uz' ? "Mehmonlar uchun kirish" : langKey === 'ru' ? 'Вход для гостей' : 'Guest Login'}</span>
+              <span className="sm:hidden">{langKey === 'uz' ? 'Mehmon' : langKey === 'ru' ? 'Гости' : 'Guest'}</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -474,14 +520,13 @@ export function LandingPage() {
             </div>
 
             {/* Bottom Row: Inputs + Search */}
-            <div className="p-4 flex flex-col sm:flex-row sm:items-end gap-3">
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-5 gap-3 items-stretch">
                 {/* Destination — regions dropdown */}
-                <div className="relative" ref={destRef}>
+                <div className="relative flex flex-col" ref={destRef}>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
                     <MapPin size={11} /> {langKey === 'uz' ? "Manzil" : langKey === 'ru' ? 'Куда' : 'Destination'}
                   </label>
-                  <div className="relative mt-1">
+                  <div className="relative mt-1 flex-1 flex">
                     <input
                       value={destOpen ? destQuery : search.destination}
                       onChange={(e) => { setDestQuery(e.target.value); setDestOpen(true); }}
@@ -513,13 +558,13 @@ export function LandingPage() {
                 </div>
 
                 {/* Check-in / Check-out — dual-month range calendar */}
-                <div className="relative sm:col-span-2" ref={calRef}>
+                <div className="relative sm:col-span-2 flex flex-col" ref={calRef}>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
                     <Calendar size={11} /> {langKey === 'uz' ? 'Sanalar' : langKey === 'ru' ? 'Даты' : 'Dates'}
                   </label>
                   <button
                     onClick={() => setCalOpen(!calOpen)}
-                    className={`w-full mt-1 rounded-xl border px-3 py-2 text-left outline-none transition-all flex items-stretch overflow-hidden ${calOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                    className={`w-full mt-1 flex-1 rounded-xl border px-3 py-2 text-left outline-none transition-all flex items-stretch overflow-hidden ${calOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
                   >
                     <div className="flex-1 min-w-0 flex flex-col justify-center px-3 py-1">
                       <span className="text-[10px] font-bold uppercase tracking-wide text-ink-400 leading-tight">
@@ -553,13 +598,13 @@ export function LandingPage() {
                 </div>
 
                 {/* Guests & Rooms — advanced popover */}
-                <div className="relative" ref={guestsRef}>
+                <div className="relative flex flex-col" ref={guestsRef}>
                   <label className="text-[11px] font-bold uppercase tracking-wide text-ink-400 flex items-center gap-1">
                     <Users size={11} /> {langKey === 'uz' ? "Mehmonlar" : langKey === 'ru' ? 'Гости' : 'Guests'}
                   </label>
                   <button
                     onClick={() => setGuestsOpen(!guestsOpen)}
-                    className={`w-full mt-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between ${guestsOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
+                    className={`w-full mt-1 flex-1 rounded-xl border px-3 py-2.5 text-sm text-left outline-none transition-all flex items-center justify-between ${guestsOpen ? 'border-cyan-400 ring-2 ring-cyan-100' : 'border-ink-200 hover:border-cyan-300'}`}
                   >
                     <span className="text-ink-800 truncate">{guestSummary}</span>
                     <ChevronDown size={15} className={`text-ink-400 shrink-0 transition-transform ${guestsOpen ? 'rotate-180' : ''}`} />
@@ -624,15 +669,19 @@ export function LandingPage() {
                     </div>
                   )}
                 </div>
+              {/* Search */}
+              <div className="flex flex-col">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-transparent select-none flex items-center gap-1" aria-hidden>
+                  <Calendar size={11} /> ·
+                </span>
+                <button
+                  onClick={handleSearch}
+                  className="mt-1 flex-1 inline-flex items-center justify-center gap-2 px-6 text-sm font-extrabold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl shadow-lg shadow-cyan-300/40 hover:from-cyan-600 hover:to-blue-700 hover:shadow-xl transition-all"
+                >
+                  <SearchIcon size={18} />
+                  {langKey === 'uz' ? "Qidirish" : langKey === 'ru' ? 'Искать' : 'Search'}
+                </button>
               </div>
-              <button
-                onClick={handleSearch}
-                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-extrabold text-white bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl shadow-lg shadow-cyan-300/40 hover:from-cyan-600 hover:to-blue-700 hover:shadow-xl transition-all sm:self-end"
-                style={{ minHeight: '44px' }}
-              >
-                <SearchIcon size={18} />
-                {langKey === 'uz' ? "Qidirish" : langKey === 'ru' ? 'Искать' : 'Search'}
-              </button>
             </div>
           </div>
         </div>
@@ -693,7 +742,7 @@ export function LandingPage() {
       )}
 
       {/* ── Products ── */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+      <section id="products" className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-extrabold tracking-tight text-ink-900">
             {langKey === 'uz' ? "Bizning mahsulotlar" : langKey === 'ru' ? 'Наши продукты' : 'Our Products'}
@@ -744,7 +793,7 @@ export function LandingPage() {
       </section>
 
       {/* ── Stats ── */}
-      <section className="bg-gradient-to-r from-cyan-600 to-blue-700 py-12">
+      <section id="about" className="bg-gradient-to-r from-cyan-600 to-blue-700 py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 text-white">
             {[
@@ -820,7 +869,7 @@ export function LandingPage() {
       </section>
 
       {/* ── Contact ── */}
-      <section className="bg-ink-50 py-14">
+      <section id="contact" className="bg-ink-50 py-14">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <h2 className="text-2xl font-extrabold tracking-tight text-ink-900 text-center mb-8">
             {langKey === 'uz' ? "Bog'lanish" : langKey === 'ru' ? 'Контакты' : 'Contact Us'}
@@ -860,9 +909,20 @@ export function LandingPage() {
 
       {/* ── Footer ── */}
       <footer className="bg-ink-900 text-ink-400 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center text-sm">
-          <p className="font-bold text-white mb-1">HospitaX — Hospitality Cloud</p>
-          <p>© 2024 HospitaX. {langKey === 'uz' ? "Barcha huquqlar himoyalangan" : langKey === 'ru' ? 'Все права защищены' : 'All rights reserved'}.</p>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center text-sm">
+            <p className="font-bold text-white mb-1">HospitaX — Hospitality Cloud</p>
+            <p>© 2024 HospitaX. {langKey === 'uz' ? "Barcha huquqlar himoyalangan" : langKey === 'ru' ? 'Все права защищены' : 'All rights reserved'}.</p>
+          </div>
+          <div className="mt-5 flex justify-center">
+            <button
+              onClick={() => setLoginOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-ink-400 hover:text-white border border-ink-700 hover:border-cyan-500/50 rounded-lg transition-all"
+            >
+              <ShieldCheck size={14} />
+              {langKey === 'uz' ? "Shaxsiy kabinetga kirish" : langKey === 'ru' ? 'Войти в личный кабинет' : 'Staff Login'}
+            </button>
+          </div>
         </div>
       </footer>
 
